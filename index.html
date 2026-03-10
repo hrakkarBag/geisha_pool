@@ -475,6 +475,8 @@ async function _renderApp(){
 
       <div class="msg-bar ${msg.text ? 'show '+(msg.type||'') : ''}" id="msgBar">${msg.text||''}</div>
 
+      ${!esSrv ? '<div class="list-card" id="misReservas" style="display:none"><h3><span class="dot dot-pend"></span> Mis solicitudes</h3><div id="misList"></div></div>' : ''}
+
       <div class="day-view">
         <div class="day-scroll">
           <div class="hours-col" id="hCol"></div>
@@ -525,6 +527,7 @@ async function _renderApp(){
     const reservas = await fetchReservas(fecha);
     renderDay(reservas);
     if(esSrv) renderListas(reservas);
+    else renderMisSolicitudes(reservas);
   } catch(e){
     showMsg('Error al conectar con la base de datos.', 'err');
   } finally {
@@ -554,8 +557,8 @@ function renderDay(reservas){
   const esSrv = modo === 'servidor';
   reservas.forEach(r => {
     const top    = (r.inicio - OPEN) * PX_MIN;
-    const height = Math.max(r.duracion * PX_MIN, 30);
-    const esProp = cliente.ci && cliente.ci === r.ci && cliente.nombre === r.cliente;
+    const esProp = !!(cliente.ci && cliente.ci === r.ci);
+    const height = Math.max(r.duracion * PX_MIN, (esProp && r.estado === 'pendiente') ? 80 : 30);
     const canEdit    = esSrv || (esProp && r.estado === 'pendiente');
     const canApprove = esSrv && r.estado === 'pendiente';
     const cls = r.estado==='pendiente' ? 'res-pend' : r.estado==='reservado' ? 'res-res' : 'res-rech';
@@ -641,6 +644,27 @@ function mkBtn(cls, txt, cb){
 /* ══════════════════════════════════════════════
    ACCIONES
 ══════════════════════════════════════════════ */
+/* ── Mis solicitudes (vista cliente) ── */
+function renderMisSolicitudes(reservas){
+  if(!cliente.ci) return;
+  const propias = reservas.filter(r => r.ci === cliente.ci && r.estado !== 'rechazado');
+  const wrap = $('misReservas'); const list = $('misList');
+  if(!wrap || !list) return;
+  if(!propias.length){ wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  list.innerHTML = '';
+  propias.forEach(r => {
+    const d = mkItem(r);
+    if(r.estado === 'pendiente'){
+      d.querySelector('.ri-actions').append(
+        mkBtn('btn btn-primary ra-btn','Editar',   () => editar(r)),
+        mkBtn('btn btn-danger ra-btn', 'Cancelar', () => cancelarProp(r))
+      );
+    }
+    list.appendChild(d);
+  });
+}
+
 async function solicitar(){
   if(solicitando) return;
 
