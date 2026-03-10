@@ -143,8 +143,8 @@ input[type=date].date-pick:focus{outline:none;border-color:var(--gold)}
 .empty{text-align:center;color:var(--muted);font-size:.85rem;padding:12px 0}
 
 /* Login */
-.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
-.login-card{width:100%;max-width:420px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:32px 28px;box-shadow:var(--shadow)}
+.login-wrap{min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:16px;gap:20px;flex-wrap:wrap}
+.login-card{width:100%;max-width:400px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:32px 28px;box-shadow:var(--shadow);flex-shrink:0;align-self:flex-start;margin-top:clamp(16px,5vh,60px)}
 .login-logo{font-family:'DM Serif Display',serif;font-size:2rem;color:var(--gold);text-align:center;margin-bottom:4px}
 .login-sub{text-align:center;color:var(--muted);font-size:.9rem;margin-bottom:24px}
 .login-field{margin-bottom:14px}
@@ -156,6 +156,28 @@ input[type=date].date-pick:focus{outline:none;border-color:var(--gold)}
 .btn-login-main{background:var(--gold);color:#0d0a00}.btn-login-main:hover{background:#e0bd6b}
 .btn-login-srv{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}.btn-login-srv:hover{color:var(--text)}
 .login-msg{margin-top:10px;font-size:.85rem;color:#f87171;text-align:center;min-height:20px}
+
+/* Vista rápida */
+.vr-card{
+  width:100%;max-width:520px;background:var(--surface);border:1px solid var(--border);
+  border-radius:20px;padding:20px;box-shadow:var(--shadow);
+  align-self:flex-start;margin-top:clamp(16px,5vh,60px);
+}
+.vr-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.vr-title{font-family:'DM Serif Display',serif;font-size:1.1rem;color:var(--gold)}
+.vr-date{font-size:.8rem;color:var(--muted);background:var(--surface2);padding:5px 10px;border-radius:var(--r-pill);border:1px solid var(--border)}
+.vr-legend{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.vr-legend span{display:flex;align-items:center;gap:5px;font-size:.72rem;color:var(--muted)}
+.vr-legend i{width:10px;height:10px;border-radius:2px;display:inline-block;flex-shrink:0}
+.vr-mini-day{display:grid;grid-template-columns:44px 1fr;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.vr-hours{background:var(--surface2);border-right:1px solid var(--border);display:flex;flex-direction:column}
+.vr-hlabel{display:flex;align-items:flex-start;justify-content:flex-end;padding:4px 6px 0 0;color:var(--muted);font-size:.65rem;font-weight:600;height:48px;border-bottom:1px solid rgba(255,255,255,.04);flex-shrink:0}
+.vr-timeline{position:relative;background:var(--surface);overflow:hidden}
+.vr-line{position:absolute;left:0;right:0;height:1px;background:rgba(255,255,255,.05)}
+.vr-block{position:absolute;left:4px;right:4px;border-radius:6px;padding:4px 6px;font-size:.72rem;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.vr-empty{text-align:center;color:var(--muted);font-size:.82rem;padding:20px 0}
+@media(max-width:900px){.vr-card{max-width:100%}}
+@media(max-width:600px){.login-wrap{flex-direction:column;align-items:center}.login-card,.vr-card{margin-top:8px}}
 
 /* Msg bar */
 .msg-bar{padding:10px 14px;border-radius:var(--r-sm);font-size:.87rem;background:var(--felt);color:var(--gold);border:1px solid var(--gold-dim);display:none}
@@ -264,17 +286,17 @@ async function rpc(fn, params){
   if(error) throw error;
 }
 
-/* ── State ── */
-let modo    = 'login';
-let cliente = {nombre:'',ci:''};
+/* ── State — persiste en sessionStorage ── */
+const ss = sessionStorage;
+let srvPin  = ss.getItem('srvPin') || '';
+let modo    = ss.getItem('modo')   || 'login';
+let cliente = JSON.parse(ss.getItem('cliente') || '{"nombre":"","ci":""}');
 let fecha   = today();
 let msg     = {text:'',type:''};
 let rtChan  = null;
-let srvPin  = sessionStorage.getItem('srvPin') || '';
-// Restaurar modo servidor si había sesión activa
-if(srvPin && sessionStorage.getItem('modo') === 'servidor'){
-  modo = 'servidor';
-}
+
+// Si había sesión de servidor activa, reconectar realtime
+if(modo === 'servidor' && srvPin) { suscribir(); }
 
 /* ── Realtime ── */
 let rtStatus = 'off'; // 'off' | 'connecting' | 'ok' | 'error'
@@ -322,8 +344,13 @@ function pushNotif(r){
 /* ══════════════════════════════════════════════
    LOGIN
 ══════════════════════════════════════════════ */
-function renderLogin(){
+async function renderLogin(){
   desuscribir();
+  // Cargar vista rápida
+  const vrHoy = today();
+  let vrReservas = [];
+  try { vrReservas = await fetchReservas(vrHoy); } catch(e){}
+
   $('root').innerHTML = `
     <div class="login-wrap">
       <div class="login-card">
@@ -337,26 +364,76 @@ function renderLogin(){
         </div>
         <div class="login-msg" id="lmsg"></div>
       </div>
+
+      <div class="vr-card">
+        <div class="vr-header">
+          <span class="vr-title">📅 Disponibilidad hoy</span>
+          <span class="vr-date">${vrHoy}</span>
+        </div>
+        <div class="vr-legend">
+          <span><i style="background:var(--pend-b)"></i> Pendiente</span>
+          <span><i style="background:var(--res-b)"></i> Reservado</span>
+          <span><i style="background:var(--rech-b)"></i> Rechazado</span>
+        </div>
+        <div id="vrWrap"></div>
+      </div>
     </div>`;
+
+  renderVistaRapida(vrReservas);
+
   $('btnIng').onclick = ()=>{
     const n=$('ln').value.trim(), c=$('lci').value.trim();
     if(!n||!c){$('lmsg').textContent='Complete nombre y CI.';return;}
-    cliente={nombre:n,ci:c}; modo='cliente'; renderApp();
+    cliente={nombre:n,ci:c};
+    ss.setItem('cliente', JSON.stringify(cliente));
+    ss.setItem('modo','cliente');
+    modo='cliente'; renderApp();
   };
   $('btnSrv').onclick = ()=>{
     const pin=prompt('PIN servidor:');
     if(pin===SERVER_PIN){
       modo='servidor'; cliente={nombre:'',ci:''}; srvPin=pin;
-      sessionStorage.setItem('srvPin', pin);
-      sessionStorage.setItem('modo', 'servidor');
+      ss.setItem('srvPin',pin); ss.setItem('modo','servidor'); ss.removeItem('cliente');
       pedirPermiso(); suscribir(); renderApp();
     } else if(pin!==null) alert('PIN incorrecto.');
   };
 }
 
-/* ══════════════════════════════════════════════
-   APP
-══════════════════════════════════════════════ */
+/* ── Vista Rápida (solo lectura, en login) ── */
+const VR_PX = 0.8; // px por minuto en vista compacta
+
+function renderVistaRapida(reservas){
+  const wrap = $('vrWrap'); if(!wrap) return;
+  const activas = reservas.filter(r=>r.estado!=='rechazado');
+  if(activas.length === 0){
+    wrap.innerHTML='<div class="vr-empty">🟢 Mesa disponible todo el día</div>'; return;
+  }
+  const totalMin = CLOSE - OPEN;
+  const altura   = totalMin * VR_PX;
+  let hoursHTML  = '';
+  let linesHTML  = '';
+  for(let h=Math.floor(OPEN/60); h<Math.floor(CLOSE/60); h++){
+    hoursHTML += `<div class="vr-hlabel" style="height:${60*VR_PX}px">${pad(h)}:00</div>`;
+    linesHTML += `<div class="vr-line" style="top:${(h*60-OPEN)*VR_PX}px"></div>`;
+  }
+  let blocksHTML = '';
+  reservas.forEach(r=>{
+    const top = (r.inicio-OPEN)*VR_PX;
+    const h   = Math.max(r.duracion*VR_PX, 18);
+    const bg  = r.estado==='pendiente'?'var(--pend-bg)':r.estado==='reservado'?'var(--res-bg)':'var(--rech-bg)';
+    const bc  = r.estado==='pendiente'?'var(--pend-b)':r.estado==='reservado'?'var(--res-b)':'var(--rech-b)';
+    blocksHTML += `<div class="vr-block" style="top:${top}px;height:${h}px;background:${bg};border-left:3px solid ${bc}">
+      ${fmt(r.inicio)}–${fmt(r.inicio+r.duracion)}
+    </div>`;
+  });
+  wrap.innerHTML = `
+    <div class="vr-mini-day">
+      <div class="vr-hours">${hoursHTML}</div>
+      <div class="vr-timeline" style="height:${altura}px">${linesHTML}${blocksHTML}</div>
+    </div>`;
+}
+
+
 async function renderApp(){
   const esSrv = modo==='servidor';
   const notifOk = 'Notification' in window && Notification.permission==='granted';
@@ -427,11 +504,14 @@ async function renderApp(){
   $('btnSalir').onclick = ()=>{
     msg={text:'',type:''};
     if(modo==='servidor'){
-      desuscribir(); modo='cliente'; cliente={nombre:'',ci:''};
-      srvPin=''; sessionStorage.removeItem('srvPin'); sessionStorage.removeItem('modo');
-      renderApp();
+      desuscribir(); modo='login'; srvPin='';
+      ss.removeItem('srvPin'); ss.removeItem('modo'); ss.removeItem('cliente');
+      renderLogin();
+    } else {
+      modo='login'; cliente={nombre:'',ci:''};
+      ss.removeItem('modo'); ss.removeItem('cliente');
+      renderLogin();
     }
-    else{modo='login';renderLogin();}
   };
   if(!esSrv){
     $('btnSolicitar').onclick = solicitar;
@@ -634,14 +714,9 @@ async function eliminar(r){
   if(!confirm(`¿Eliminar la reserva de ${r.cliente} (${fmt(r.inicio)}–${fmt(r.inicio+r.duracion)})?`)) return;
   loader(true);
   try {
-    if(!srvPin){ showMsg('Sesión expirada — vuelve a ingresar como servidor.','err'); loader(false); renderApp(); return; }
     await rpc('srv_eliminar',{p_pin:srvPin, p_id:r.id});
     showMsg('Reserva eliminada.','err');
-  } catch(e){
-    const txt = e?.message || JSON.stringify(e) || 'Error al eliminar.';
-    showMsg('Error: '+txt,'err');
-    console.error('eliminar error',e);
-  }
+  } catch(e){showMsg(e.message||'Error al eliminar.','err');}
   finally{loader(false);renderApp();}
 }
 
@@ -682,7 +757,9 @@ if('serviceWorker' in navigator){
   });
 }
 
-renderLogin();
-</script>
+// Boot — restaurar sesión si existe
+if(modo === 'servidor' && srvPin){ pedirPermiso(); renderApp(); }
+else if(modo === 'cliente' && cliente.nombre){ renderApp(); }
+else { renderLogin(); }
 </body>
 </html>
