@@ -270,7 +270,11 @@ let cliente = {nombre:'',ci:''};
 let fecha   = today();
 let msg     = {text:'',type:''};
 let rtChan  = null;
-let srvPin  = '';   // se guarda en memoria al hacer login como servidor
+let srvPin  = sessionStorage.getItem('srvPin') || '';
+// Restaurar modo servidor si había sesión activa
+if(srvPin && sessionStorage.getItem('modo') === 'servidor'){
+  modo = 'servidor';
+}
 
 /* ── Realtime ── */
 let rtStatus = 'off'; // 'off' | 'connecting' | 'ok' | 'error'
@@ -343,6 +347,8 @@ function renderLogin(){
     const pin=prompt('PIN servidor:');
     if(pin===SERVER_PIN){
       modo='servidor'; cliente={nombre:'',ci:''}; srvPin=pin;
+      sessionStorage.setItem('srvPin', pin);
+      sessionStorage.setItem('modo', 'servidor');
       pedirPermiso(); suscribir(); renderApp();
     } else if(pin!==null) alert('PIN incorrecto.');
   };
@@ -420,7 +426,11 @@ async function renderApp(){
   $('fechaPick').onchange = e=>{ fecha=e.target.value; msg={text:'',type:''}; renderApp(); };
   $('btnSalir').onclick = ()=>{
     msg={text:'',type:''};
-    if(modo==='servidor'){desuscribir();modo='cliente';cliente={nombre:'',ci:''};renderApp();}
+    if(modo==='servidor'){
+      desuscribir(); modo='cliente'; cliente={nombre:'',ci:''};
+      srvPin=''; sessionStorage.removeItem('srvPin'); sessionStorage.removeItem('modo');
+      renderApp();
+    }
     else{modo='login';renderLogin();}
   };
   if(!esSrv){
@@ -624,9 +634,14 @@ async function eliminar(r){
   if(!confirm(`¿Eliminar la reserva de ${r.cliente} (${fmt(r.inicio)}–${fmt(r.inicio+r.duracion)})?`)) return;
   loader(true);
   try {
+    if(!srvPin){ showMsg('Sesión expirada — vuelve a ingresar como servidor.','err'); loader(false); renderApp(); return; }
     await rpc('srv_eliminar',{p_pin:srvPin, p_id:r.id});
     showMsg('Reserva eliminada.','err');
-  } catch(e){showMsg(e.message||'Error al eliminar.','err');}
+  } catch(e){
+    const txt = e?.message || JSON.stringify(e) || 'Error al eliminar.';
+    showMsg('Error: '+txt,'err');
+    console.error('eliminar error',e);
+  }
   finally{loader(false);renderApp();}
 }
 

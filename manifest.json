@@ -1,6 +1,6 @@
 {
-  "name": "Billar Club — Reservas",
-  "short_name": "Billar Club",
+  "name": "Geisha Bar — Reservas de Billar",
+  "short_name": "Geisha Pool",
   "description": "Sistema de reservas para mesa de billar",
   "start_url": "./index.html",
   "display": "standalone",
@@ -9,18 +9,8 @@
   "theme_color": "#c9a84c",
   "lang": "es",
   "icons": [
-    {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ],
   "categories": ["productivity", "utilities"],
   "screenshots": []
