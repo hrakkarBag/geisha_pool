@@ -295,6 +295,11 @@ let msg     = {text:'', type:''};
 let rtChan   = null;
 let rtStatus = 'off';
 
+/* ── Guards de concurrencia ── */
+let solicitando  = false;   // evita doble-submit del cliente
+let renderingApp = false;   // evita renders solapados
+let pendingRender = false;  // encola el render si ya hay uno en curso
+
 function suscribir(){
   if(rtChan) db.removeChannel(rtChan);
   rtStatus = 'connecting';
@@ -422,6 +427,15 @@ function renderVistaRapida(reservas){
    APP
 ══════════════════════════════════════════════ */
 async function renderApp(){
+  if(renderingApp){ pendingRender = true; return; }
+  renderingApp = true; pendingRender = false;
+  try { await _renderApp(); } finally {
+    renderingApp = false;
+    if(pendingRender) renderApp();
+  }
+}
+
+async function _renderApp(){
   const esSrv  = modo === 'servidor';
   const notifOk = 'Notification' in window && Notification.permission === 'granted';
 
@@ -627,6 +641,8 @@ function mkBtn(cls, txt, cb){
    ACCIONES
 ══════════════════════════════════════════════ */
 async function solicitar(){
+  if(solicitando) return;
+
   const hora = $('fHora').value, dur = parseInt($('fDur').value, 10);
   const msgEl = $('fMsg');
   msgEl.textContent = ''; msgEl.style.color = '#f87171';
@@ -636,24 +652,36 @@ async function solicitar(){
   if(inicio < OPEN || inicio + dur > CLOSE){ msgEl.textContent = 'Fuera de horario (13:00–24:00).'; return; }
   if(fecha === today() && inicio < nowMin()){ msgEl.textContent = 'No puede reservar en el pasado.'; return; }
 
-  const btn = $('btnSolicitar'); btn.disabled = true; loader(true);
+  solicitando = true;
+  const btn = $('btnSolicitar'); if(btn) btn.disabled = true; loader(true);
+  let exito = false;
   try {
     const existentes = await fetchReservas(fecha);
-    if(overlap(inicio, dur, existentes)){ msgEl.textContent = 'Horario no disponible.'; return; }
+    const m = $('fMsg');
+    if(overlap(inicio, dur, existentes)){
+      if(m){ m.style.color='#f87171'; m.textContent = 'Horario no disponible.'; }
+      return;
+    }
     await insertReserva({
       id: uid(), fecha, inicio, duracion: dur,
       cliente: cliente.nombre, ci: cliente.ci,
       estado: 'pendiente', creado: Date.now()
     });
-    msgEl.style.color = '#86efac';
-    msgEl.textContent = '✓ Solicitud enviada — pendiente de aprobación.';
-    setTimeout(() => { msg = {text:'',type:''}; renderApp(); }, 1200);
+    exito = true;
+    msg = {text:'Solicitud enviada — pendiente de aprobación.', type:'ok'};
+    const m2 = $('fMsg');
+    if(m2){ m2.style.color = '#86efac'; m2.textContent = '✓ ' + msg.text; }
+    setTimeout(() => { solicitando = false; msg = {text:'',type:''}; renderApp(); }, 2000);
   } catch(e){
     console.error('solicitar', e);
-    msgEl.textContent = 'Error al enviar: ' + (e.message || 'verifica tu conexión.');
+    const m = $('fMsg');
+    if(m){ m.style.color='#f87171'; m.textContent = 'Error al enviar: ' + (e.message || 'verifica tu conexión.'); }
   } finally {
     loader(false);
-    const b2 = $('btnSolicitar'); if(b2) b2.disabled = false;
+    if(!exito){
+      solicitando = false;
+      const b2 = $('btnSolicitar'); if(b2) b2.disabled = false;
+    }
   }
 }
 
