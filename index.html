@@ -555,45 +555,61 @@ function renderDay(reservas){
   }
 
   const esSrv = modo === 'servidor';
+
   reservas.forEach(r => {
-    const esProp = !!(cliente.ci && cliente.ci.trim().toLowerCase() === r.ci.trim().toLowerCase());
-    // En vista cliente, ocultar completamente los rechazados ajenos (el slot ya está libre)
+    const ciCliente = cliente.ci ? cliente.ci.trim().toLowerCase() : '';
+    const esProp    = !esSrv && ciCliente !== '' && ciCliente === r.ci.trim().toLowerCase();
+
+    // Clientes: rechazados ajenos son invisibles (el slot queda libre)
     if (!esSrv && !esProp && r.estado === 'rechazado') return;
 
     const top    = (r.inicio - OPEN) * PX_MIN;
-    const height = Math.max(r.duracion * PX_MIN, (esProp && r.estado === 'pendiente') ? 80 : 30);
-    const canEdit    = esSrv || (esProp && r.estado === 'pendiente');
-    const canApprove = esSrv && r.estado === 'pendiente';
+    const height = Math.max(r.duracion * PX_MIN, (esSrv || esProp) ? 80 : 30);
     const cls = r.estado==='pendiente' ? 'res-pend' : r.estado==='reservado' ? 'res-res' : 'res-rech';
-    const bc  = r.estado==='pendiente' ? 'badge-p'  : r.estado==='reservado' ? 'badge-r' : 'badge-x';
-    const bt  = r.estado==='pendiente' ? 'Pendiente' : r.estado==='reservado' ? 'Reservado' : 'Rechazado';
 
     const div = document.createElement('div');
     div.className = `res-block ${cls}`;
     div.style.cssText = `top:${top}px;height:${height}px`;
-    const mostrarDatos = esSrv || esProp;
-    if (mostrarDatos) {
+
+    if (esSrv) {
+      /* ── Servidor: vista completa ── */
+      const bc = r.estado==='pendiente' ? 'badge-p' : r.estado==='reservado' ? 'badge-r' : 'badge-x';
+      const bt = r.estado==='pendiente' ? 'Pendiente' : r.estado==='reservado' ? 'Reservado' : 'Rechazado';
       div.innerHTML = `
         <div class="r-name">${r.cliente}</div>
         <div class="r-meta">${fmt(r.inicio)} – ${fmt(r.inicio+r.duracion)} · CI ${r.ci||'—'}</div>
         <span class="r-badge ${bc}">${bt}</span>
         <div class="r-actions" id="ra-${r.id}"></div>`;
+      const ac = div.querySelector(`#ra-${r.id}`);
+      if (r.estado === 'pendiente') {
+        ac.append(mkBtn('ra-btn ra-approve', '✓ Aprobar',  () => aprobar(r.id)));
+        ac.append(mkBtn('ra-btn ra-reject',  '✗ Rechazar', () => rechazar(r.id)));
+      }
+      ac.append(mkBtn('ra-btn ra-edit',   'Editar', () => editar(r)));
+      ac.append(mkBtn('ra-btn ra-delete', '🗑',      () => eliminar(r)));
+
+    } else if (esProp) {
+      /* ── Cliente: reserva propia ── */
+      const bc = r.estado==='pendiente' ? 'badge-p' : r.estado==='reservado' ? 'badge-r' : 'badge-x';
+      const bt = r.estado==='pendiente' ? 'Pendiente' : r.estado==='reservado' ? 'Reservado' : 'Rechazado';
+      div.innerHTML = `
+        <div class="r-name">${r.cliente}</div>
+        <div class="r-meta">${fmt(r.inicio)} – ${fmt(r.inicio+r.duracion)}</div>
+        <span class="r-badge ${bc}">${bt}</span>
+        <div class="r-actions" id="ra-${r.id}"></div>`;
+      if (r.estado === 'pendiente') {
+        const ac = div.querySelector(`#ra-${r.id}`);
+        ac.append(mkBtn('ra-btn ra-edit',   'Editar',     () => editar(r)));
+        ac.append(mkBtn('ra-btn ra-delete', '🗑 Cancelar', () => cancelarProp(r)));
+      }
+
     } else {
-      // Bloque ajeno: solo hora, sin nombre/CI/estado
+      /* ── Cliente: reserva ajena — sin datos personales ── */
       div.innerHTML = `
         <div class="r-name">Ocupado</div>
-        <div class="r-meta">${fmt(r.inicio)} – ${fmt(r.inicio+r.duracion)}</div>
-        <div class="r-actions" id="ra-${r.id}"></div>`;
+        <div class="r-meta">${fmt(r.inicio)} – ${fmt(r.inicio+r.duracion)}</div>`;
     }
 
-    const ac = div.querySelector(`#ra-${r.id}`);
-    if(canApprove){
-      ac.append(mkBtn('ra-btn ra-approve','✓ Aprobar', () => aprobar(r.id)));
-      ac.append(mkBtn('ra-btn ra-reject', '✗ Rechazar',() => rechazar(r.id)));
-    }
-    if(canEdit)  ac.append(mkBtn('ra-btn ra-edit',  'Editar', () => editar(r)));
-    if(esSrv)    ac.append(mkBtn('ra-btn ra-delete', '🗑',     () => eliminar(r)));
-    if(!esSrv && esProp && r.estado === 'pendiente') ac.append(mkBtn('ra-btn ra-delete', '🗑 Cancelar', () => cancelarProp(r)));
     tLine.appendChild(div);
   });
 }
@@ -748,31 +764,39 @@ async function rechazar(id){
 }
 
 async function editar(r){
-  const esPropCliente = modo === 'cliente' && cliente.ci.trim().toLowerCase() === r.ci.trim().toLowerCase() && r.estado === 'pendiente';
-  if(modo !== 'servidor' && !esPropCliente){ alert('No puedes editar esta reserva.'); return; }
-  const nh = prompt('Nueva hora inicio (HH:MM):', fmt(r.inicio)); if(!nh) return;
-  const nd = prompt('Nueva duración (min):', String(r.duracion)); if(!nd) return;
+  const esSrv = modo === 'servidor';
+  const ciCliente = cliente.ci ? cliente.ci.trim().toLowerCase() : '';
+  const esPropPend = !esSrv && ciCliente !== '' && ciCliente === r.ci.trim().toLowerCase() && r.estado === 'pendiente';
+
+  if (!esSrv && !esPropPend) {
+    alert('Solo puedes editar tus propias solicitudes pendientes.');
+    return;
+  }
+
+  const nh = prompt('Nueva hora inicio (HH:MM):', fmt(r.inicio)); if (!nh) return;
+  const nd = prompt('Nueva duración (min):', String(r.duracion)); if (!nd) return;
   const inicio = t2m(nh), dur = parseInt(nd, 10);
-  if(isNaN(dur) || dur < 15){ alert('Duración inválida.'); return; }
-  if(inicio < OPEN || inicio + dur > CLOSE){ alert('Fuera de horario (13:00–24:00).'); return; }
+  if (isNaN(dur) || dur < 15) { alert('Duración mínima 15 min.'); return; }
+  if (inicio < OPEN || inicio + dur > CLOSE) { alert('Fuera de horario (13:00–24:00).'); return; }
+
   loader(true);
   try {
-    if(esPropCliente){
-      const reservas = await fetchReservas(fecha);
-      const soloAprobadas = reservas.filter(x => x.estado === 'reservado');
-      if(overlap(inicio, dur, soloAprobadas, r.id)){
-        showMsg('Ese horario ya está reservado. Elige otro.', 'err');
-        loader(false); return;
-      }
-      await rpc('cli_editar', {p_ci: cliente.ci.trim(), p_id: r.id, p_inicio: inicio, p_duracion: dur});
-    } else {
-      const reservas = await fetchReservas(fecha);
-      if(overlap(inicio, dur, reservas, r.id))
-        if(!confirm('Solapamiento. ¿Aplicar igualmente?')){ loader(false); return; }
+    const reservas = await fetchReservas(fecha);
+    if (esSrv) {
+      if (overlap(inicio, dur, reservas, r.id))
+        if (!confirm('Solapamiento. ¿Aplicar igualmente?')) { loader(false); return; }
       await rpc('srv_editar', {p_pin: srvPin, p_id: r.id, p_inicio: inicio, p_duracion: dur, p_ci: null});
+    } else {
+      // Cliente editando su propia reserva pendiente
+      const aprobadas = reservas.filter(x => x.estado === 'reservado');
+      if (overlap(inicio, dur, aprobadas, r.id)) {
+        showMsg('Ese horario ya está reservado. Elige otro.', 'err');
+        loader(false); renderApp(); return;
+      }
+      await rpc('cli_editar', {p_ci: ciCliente, p_id: r.id, p_inicio: inicio, p_duracion: dur});
     }
     showMsg('Reserva actualizada.', 'ok');
-  } catch(e){ showMsg(e.message || 'Error al editar.', 'err'); }
+  } catch(e) { showMsg(e.message || 'Error al editar.', 'err'); }
   finally { loader(false); renderApp(); }
 }
 
@@ -780,7 +804,7 @@ async function cancelarProp(r){
   if(!confirm('¿Cancelar tu solicitud de ' + fmt(r.inicio) + '–' + fmt(r.inicio+r.duracion) + '?')) return;
   loader(true);
   try {
-    await rpc('cli_eliminar', {p_ci: cliente.ci.trim(), p_id: r.id});
+    await rpc('cli_eliminar', {p_ci: cliente.ci.trim().toLowerCase(), p_id: r.id});
     showMsg('Solicitud cancelada.', 'err');
   } catch(e){ showMsg(e.message || 'Error al cancelar.', 'err'); }
   finally { loader(false); renderApp(); }
