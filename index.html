@@ -556,8 +556,11 @@ function renderDay(reservas){
 
   const esSrv = modo === 'servidor';
   reservas.forEach(r => {
-    const top    = (r.inicio - OPEN) * PX_MIN;
     const esProp = !!(cliente.ci && cliente.ci.trim().toLowerCase() === r.ci.trim().toLowerCase());
+    // En vista cliente, ocultar completamente los rechazados ajenos (el slot ya está libre)
+    if (!esSrv && !esProp && r.estado === 'rechazado') return;
+
+    const top    = (r.inicio - OPEN) * PX_MIN;
     const height = Math.max(r.duracion * PX_MIN, (esProp && r.estado === 'pendiente') ? 80 : 30);
     const canEdit    = esSrv || (esProp && r.estado === 'pendiente');
     const canApprove = esSrv && r.estado === 'pendiente';
@@ -568,13 +571,20 @@ function renderDay(reservas){
     const div = document.createElement('div');
     div.className = `res-block ${cls}`;
     div.style.cssText = `top:${top}px;height:${height}px`;
-    // Clientes solo ven sus propios datos; los ajenos se anonimizan
     const mostrarDatos = esSrv || esProp;
-    div.innerHTML = `
-      <div class="r-name">${mostrarDatos ? r.cliente : (r.estado === 'reservado' ? 'Reservado' : 'Solicitado')}</div>
-      <div class="r-meta">${fmt(r.inicio)} – ${fmt(r.inicio+r.duracion)}${mostrarDatos ? ' · CI ' + (r.ci||'—') : ''}</div>
-      <span class="r-badge ${bc}">${bt}</span>
-      <div class="r-actions" id="ra-${r.id}"></div>`;
+    if (mostrarDatos) {
+      div.innerHTML = `
+        <div class="r-name">${r.cliente}</div>
+        <div class="r-meta">${fmt(r.inicio)} – ${fmt(r.inicio+r.duracion)} · CI ${r.ci||'—'}</div>
+        <span class="r-badge ${bc}">${bt}</span>
+        <div class="r-actions" id="ra-${r.id}"></div>`;
+    } else {
+      // Bloque ajeno: solo hora, sin nombre/CI/estado
+      div.innerHTML = `
+        <div class="r-name">Ocupado</div>
+        <div class="r-meta">${fmt(r.inicio)} – ${fmt(r.inicio+r.duracion)}</div>
+        <div class="r-actions" id="ra-${r.id}"></div>`;
+    }
 
     const ac = div.querySelector(`#ra-${r.id}`);
     if(canApprove){
@@ -748,6 +758,12 @@ async function editar(r){
   loader(true);
   try {
     if(esPropCliente){
+      const reservas = await fetchReservas(fecha);
+      const soloAprobadas = reservas.filter(x => x.estado === 'reservado');
+      if(overlap(inicio, dur, soloAprobadas, r.id)){
+        showMsg('Ese horario ya está reservado. Elige otro.', 'err');
+        loader(false); return;
+      }
       await rpc('cli_editar', {p_ci: cliente.ci.trim(), p_id: r.id, p_inicio: inicio, p_duracion: dur});
     } else {
       const reservas = await fetchReservas(fecha);
