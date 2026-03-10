@@ -284,7 +284,7 @@ async function rpc(fn, params){
 }
 
 /* ── Estado (persiste en sessionStorage) ── */
-const ss = sessionStorage;
+const ss = localStorage;
 let modo    = ss.getItem('modo') || 'login';
 let srvPin  = ss.getItem('srvPin') || '';
 let cliente = (() => { try { return JSON.parse(ss.getItem('cliente') || 'null') || {nombre:'',ci:''}; } catch(e){ return {nombre:'',ci:''}; } })();
