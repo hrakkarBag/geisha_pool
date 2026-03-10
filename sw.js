@@ -3,7 +3,7 @@
    Estrategia: Cache First para assets estáticos
    ───────────────────────────────────────────── */
 
-const CACHE_NAME  = 'geisha-bar-v4';
+const CACHE_NAME  = 'geisha-bar-v5';
 const CACHE_URLS  = [
   './index.html',
   './manifest.json',
@@ -52,6 +52,9 @@ self.addEventListener('fetch', event => {
 
   // Ignorar chrome-extension u otros esquemas
   if (!event.request.url.startsWith('http')) return;
+
+  // NUNCA cachear llamadas a Supabase (datos dinamicos en tiempo real)
+  if (event.request.url.includes('.supabase.co')) return;
 
   event.respondWith(
     caches.match(event.request).then(cached => {
