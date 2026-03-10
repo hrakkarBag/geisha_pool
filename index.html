@@ -238,117 +238,106 @@ input[type=date].date-pick:focus{outline:none;border-color:var(--gold)}
 
 <script>
 /* ══════════════════════════════════════════════
-   ▶▶  CONFIGURACIÓN — pega tus credenciales  ◀◀
-   ══════════════════════════════════════════════ */
+   CONFIGURACIÓN
+══════════════════════════════════════════════ */
 const SUPABASE_URL  = 'https://pvoafqlwevbmfmdbdjsx.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB2b2FmcWx3ZXZibWZtZGJkanN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNDIyOTgsImV4cCI6MjA4ODYxODI5OH0.xdv1XQiafCrVWs1ccz1K_P472pNtB-rvlQ5fdQUd51U';
-/* ══════════════════════════════════════════════ */
-
 const SERVER_PIN = '0213';
-const OPEN       = 13 * 60;
-const CLOSE      = 24 * 60;
-const PX_MIN     = 1;
+const OPEN  = 13 * 60;   // 13:00
+const CLOSE = 24 * 60;   // 24:00
+const PX_MIN = 1;
 
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_ANON);
 
-/* Utils */
+/* ── Utilidades ── */
 const $      = id => document.getElementById(id);
 const pad    = n  => String(n).padStart(2,'0');
 const today  = () => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
 const fmt    = m  => `${pad(Math.floor(m/60))}:${pad(m%60)}`;
-const t2m    = t  => { const[h,m]=t.split(':').map(Number); return h*60+m; };
+const t2m    = t  => { const [h,m]=t.split(':').map(Number); return h*60+m; };
 const nowMin = () => { const d=new Date(); return d.getHours()*60+d.getMinutes(); };
 const uid    = () => Date.now()+'-'+Math.random().toString(36).slice(2,8);
 const loader = v  => $('loader').classList.toggle('show', v);
 
 function overlap(start, dur, list, skipId=null){
-  const end = start+dur;
-  return list.some(r=>{
-    if(r.id===skipId || r.estado==='rechazado') return false;
-    return start < r.inicio+r.duracion && end > r.inicio;
+  const end = start + dur;
+  return list.some(r => {
+    if(r.id === skipId || r.estado === 'rechazado') return false;
+    return start < r.inicio + r.duracion && end > r.inicio;
   });
 }
 
-/* ── Supabase data layer ── */
+/* ── BD ── */
 async function fetchReservas(fecha){
-  const {data,error} = await db.from('reservas').select('*').eq('fecha',fecha).order('inicio');
-  if(error){ console.error(error); return []; }
-  return data||[];
+  const {data, error} = await db.from('reservas').select('*').eq('fecha', fecha).order('inicio');
+  if(error){ console.error('fetchReservas', error); return []; }
+  return data || [];
 }
 async function insertReserva(r){
-  const {error}=await db.from('reservas').insert(r);
+  const {error} = await db.from('reservas').insert(r);
   if(error) throw error;
 }
-// Todas las mutaciones privilegiadas van por RPC → el PIN se verifica en la BD
 async function rpc(fn, params){
   const {error} = await db.rpc(fn, params);
   if(error) throw error;
 }
 
-/* ── State — persiste en sessionStorage ── */
+/* ── Estado (persiste en sessionStorage) ── */
 const ss = sessionStorage;
+let modo    = ss.getItem('modo') || 'login';
 let srvPin  = ss.getItem('srvPin') || '';
-let modo    = ss.getItem('modo')   || 'login';
-let cliente = JSON.parse(ss.getItem('cliente') || '{"nombre":"","ci":""}');
+let cliente = (() => { try { return JSON.parse(ss.getItem('cliente') || 'null') || {nombre:'',ci:''}; } catch(e){ return {nombre:'',ci:''}; } })();
 let fecha   = today();
-let msg     = {text:'',type:''};
-let rtChan  = null;
-
+let msg     = {text:'', type:''};
 
 /* ── Realtime ── */
-let rtStatus = 'off'; // 'off' | 'connecting' | 'ok' | 'error'
+let rtChan   = null;
+let rtStatus = 'off';
 
 function suscribir(){
   if(rtChan) db.removeChannel(rtChan);
   rtStatus = 'connecting';
   rtChan = db.channel('reservas-changes')
-    .on('postgres_changes',{event:'*',schema:'public',table:'reservas'}, payload => {
+    .on('postgres_changes', {event:'*', schema:'public', table:'reservas'}, payload => {
       renderApp();
-      if(payload.eventType==='INSERT') pushNotif(payload.new);
+      if(payload.eventType === 'INSERT') pushNotif(payload.new);
     })
     .subscribe(status => {
-      if(status === 'SUBSCRIBED')      { rtStatus='ok';         updateRtBadge(); }
-      else if(status === 'CLOSED' ||
-              status === 'CHANNEL_ERROR'){ rtStatus='error';    updateRtBadge(); }
+      if(status === 'SUBSCRIBED')                              { rtStatus = 'ok';    updateRtBadge(); }
+      else if(status === 'CLOSED' || status === 'CHANNEL_ERROR'){ rtStatus = 'error'; updateRtBadge(); }
     });
 }
-function desuscribir(){ if(rtChan){db.removeChannel(rtChan);rtChan=null;} rtStatus='off'; }
-
+function desuscribir(){
+  if(rtChan){ db.removeChannel(rtChan); rtChan = null; }
+  rtStatus = 'off';
+}
 function updateRtBadge(){
-  const el = document.getElementById('rtBadge');
-  if(!el) return;
-  const map = {
-    connecting: { label:'Conectando…', dot:'#d97706' },
-    ok:         { label:'En vivo',     dot:'#2ea84e' },
-    error:      { label:'Sin Realtime',dot:'#e53e3e' },
-  };
+  const el = $('rtBadge'); if(!el) return;
+  const map = { connecting:{label:'Conectando…',dot:'#d97706'}, ok:{label:'En vivo',dot:'#2ea84e'}, error:{label:'Sin Realtime',dot:'#e53e3e'} };
   const s = map[rtStatus] || map.ok;
   el.innerHTML = `${s.label}<span class="rt-dot" style="background:${s.dot}"></span>`;
 }
 
 async function pedirPermiso(){
-  if('Notification' in window && Notification.permission==='default')
+  if('Notification' in window && Notification.permission === 'default')
     await Notification.requestPermission();
 }
 function pushNotif(r){
-  if(!('Notification' in window)||Notification.permission!=='granted') return;
-  new Notification('🎱 Nueva solicitud — Geisha Bar',{
-    body:`${r.cliente} (CI ${r.ci})  ·  ${fmt(r.inicio)}–${fmt(r.inicio+r.duracion)}`,
-    icon:'./icon-192.png', tag:'res-'+r.id, renotify:true
+  if(!('Notification' in window) || Notification.permission !== 'granted') return;
+  new Notification('🎱 Nueva solicitud — Geisha Bar', {
+    body: `${r.cliente} (CI ${r.ci}) · ${fmt(r.inicio)}–${fmt(r.inicio+r.duracion)}`,
+    icon: './icon-192.png', tag: 'res-'+r.id, renotify: true
   });
 }
 
 /* ══════════════════════════════════════════════
    LOGIN
 ══════════════════════════════════════════════ */
-async function renderLogin(){
+function renderLogin(){
   desuscribir();
-  // Cargar vista rápida
-  const vrHoy = today();
-  let vrReservas = [];
-  try { vrReservas = await fetchReservas(vrHoy); } catch(e){}
 
+  // Renderiza HTML inmediatamente (sin await)
   $('root').innerHTML = `
     <div class="login-wrap">
       <div class="login-card">
@@ -362,67 +351,65 @@ async function renderLogin(){
         </div>
         <div class="login-msg" id="lmsg"></div>
       </div>
-
       <div class="vr-card">
         <div class="vr-header">
           <span class="vr-title">📅 Disponibilidad hoy</span>
-          <span class="vr-date">${vrHoy}</span>
+          <span class="vr-date">${today()}</span>
         </div>
         <div class="vr-legend">
           <span><i style="background:var(--pend-b)"></i> Pendiente</span>
           <span><i style="background:var(--res-b)"></i> Reservado</span>
-          <span><i style="background:var(--rech-b)"></i> Rechazado</span>
         </div>
-        <div id="vrWrap"></div>
+        <div id="vrWrap"><div class="vr-empty">Cargando…</div></div>
       </div>
     </div>`;
 
-  renderVistaRapida(vrReservas);
+  // Carga vista rápida en segundo plano
+  fetchReservas(today()).then(r => renderVistaRapida(r)).catch(() => {
+    const w = $('vrWrap'); if(w) w.innerHTML = '<div class="vr-empty">Sin conexión</div>';
+  });
 
-  $('btnIng').onclick = ()=>{
-    const n=$('ln').value.trim(), c=$('lci').value.trim();
-    if(!n||!c){$('lmsg').textContent='Complete nombre y CI.';return;}
-    cliente={nombre:n,ci:c};
+  $('btnIng').onclick = () => {
+    const n = $('ln').value.trim(), c = $('lci').value.trim();
+    if(!n || !c){ $('lmsg').textContent = 'Complete nombre y CI.'; return; }
+    cliente = {nombre:n, ci:c};
     ss.setItem('cliente', JSON.stringify(cliente));
-    ss.setItem('modo','cliente');
-    modo='cliente'; renderApp();
+    ss.setItem('modo', 'cliente');
+    modo = 'cliente';
+    renderApp();
   };
-  $('btnSrv').onclick = ()=>{
-    const pin=prompt('PIN servidor:');
-    if(pin===SERVER_PIN){
-      modo='servidor'; cliente={nombre:'',ci:''}; srvPin=pin;
-      ss.setItem('srvPin',pin); ss.setItem('modo','servidor'); ss.removeItem('cliente');
+  $('btnSrv').onclick = () => {
+    const pin = prompt('PIN servidor:');
+    if(pin === SERVER_PIN){
+      modo = 'servidor'; srvPin = pin; cliente = {nombre:'', ci:''};
+      ss.setItem('srvPin', pin); ss.setItem('modo', 'servidor'); ss.removeItem('cliente');
       pedirPermiso(); suscribir(); renderApp();
-    } else if(pin!==null) alert('PIN incorrecto.');
+    } else if(pin !== null) {
+      alert('PIN incorrecto.');
+    }
   };
 }
 
-/* ── Vista Rápida (solo lectura, en login) ── */
-const VR_PX = 0.8; // px por minuto en vista compacta
-
+/* ── Vista Rápida ── */
 function renderVistaRapida(reservas){
   const wrap = $('vrWrap'); if(!wrap) return;
-  const activas = reservas.filter(r=>r.estado!=='rechazado');
-  if(activas.length === 0){
-    wrap.innerHTML='<div class="vr-empty">🟢 Mesa disponible todo el día</div>'; return;
+  const activas = reservas.filter(r => r.estado !== 'rechazado');
+  if(!activas.length){
+    wrap.innerHTML = '<div class="vr-empty">🟢 Mesa disponible todo el día</div>'; return;
   }
-  const totalMin = CLOSE - OPEN;
-  const altura   = totalMin * VR_PX;
-  let hoursHTML  = '';
-  let linesHTML  = '';
-  for(let h=Math.floor(OPEN/60); h<Math.floor(CLOSE/60); h++){
-    hoursHTML += `<div class="vr-hlabel" style="height:${60*VR_PX}px">${pad(h)}:00</div>`;
-    linesHTML += `<div class="vr-line" style="top:${(h*60-OPEN)*VR_PX}px"></div>`;
+  const VR = 0.8;
+  const altura = (CLOSE - OPEN) * VR;
+  let hoursHTML = '', linesHTML = '', blocksHTML = '';
+  for(let h = Math.floor(OPEN/60); h < Math.floor(CLOSE/60); h++){
+    hoursHTML += `<div class="vr-hlabel" style="height:${60*VR}px">${pad(h)}:00</div>`;
+    linesHTML += `<div class="vr-line" style="top:${(h*60-OPEN)*VR}px"></div>`;
   }
-  let blocksHTML = '';
-  reservas.forEach(r=>{
-    const top = (r.inicio-OPEN)*VR_PX;
-    const h   = Math.max(r.duracion*VR_PX, 18);
-    const bg  = r.estado==='pendiente'?'var(--pend-bg)':r.estado==='reservado'?'var(--res-bg)':'var(--rech-bg)';
-    const bc  = r.estado==='pendiente'?'var(--pend-b)':r.estado==='reservado'?'var(--res-b)':'var(--rech-b)';
-    blocksHTML += `<div class="vr-block" style="top:${top}px;height:${h}px;background:${bg};border-left:3px solid ${bc}">
-      ${fmt(r.inicio)}–${fmt(r.inicio+r.duracion)}
-    </div>`;
+  reservas.forEach(r => {
+    const top = (r.inicio - OPEN) * VR;
+    const h   = Math.max(r.duracion * VR, 18);
+    const bg  = r.estado==='pendiente' ? 'var(--pend-bg)' : r.estado==='reservado' ? 'var(--res-bg)' : 'var(--rech-bg)';
+    const bc  = r.estado==='pendiente' ? 'var(--pend-b)'  : r.estado==='reservado' ? 'var(--res-b)'  : 'var(--rech-b)';
+    blocksHTML += `<div class="vr-block" style="top:${top}px;height:${h}px;background:${bg};border-left:3px solid ${bc}">${fmt(r.inicio)}–${fmt(r.inicio+r.duracion)}</div>`;
   });
   wrap.innerHTML = `
     <div class="vr-mini-day">
@@ -431,10 +418,12 @@ function renderVistaRapida(reservas){
     </div>`;
 }
 
-
+/* ══════════════════════════════════════════════
+   APP
+══════════════════════════════════════════════ */
 async function renderApp(){
-  const esSrv = modo==='servidor';
-  const notifOk = 'Notification' in window && Notification.permission==='granted';
+  const esSrv  = modo === 'servidor';
+  const notifOk = 'Notification' in window && Notification.permission === 'granted';
 
   $('root').innerHTML = `
     <div class="app">
@@ -442,36 +431,35 @@ async function renderApp(){
         <div class="logo"><img src="./icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:6px;vertical-align:middle;margin-right:8px" alt="">Geisha Bar<span>/ Reservas</span></div>
         <div class="header-right">
           <input type="date" class="date-pick" id="fechaPick" value="${fecha}">
-          <span class="badge-role">${esSrv?'🔧 Servidor':'👤 '+cliente.nombre}</span>
-          ${esSrv?`
+          <span class="badge-role">${esSrv ? '🔧 Servidor' : '👤 '+cliente.nombre}</span>
+          ${esSrv ? `
             <span class="badge-role" id="rtBadge" style="font-size:.72rem;display:inline-flex;align-items:center;gap:4px">
               Conectando…<span class="rt-dot" style="background:#d97706"></span>
             </span>
             <button class="btn btn-gold" id="btnCheck">Verificar llegada</button>
             ${!notifOk
               ? `<button class="btn btn-gold" id="btnNotif">🔔 Activar avisos</button>`
-              : `<span class="badge-role" style="font-size:.72rem">🔔 Avisos activos</span>`
-            }
-          `:''}
-          <button class="btn btn-ghost" id="btnSalir">${esSrv?'Salir':'Cerrar sesión'}</button>
+              : `<span class="badge-role" style="font-size:.72rem">🔔 Avisos activos</span>`}
+          ` : ''}
+          <button class="btn btn-ghost" id="btnSalir">${esSrv ? 'Salir' : 'Cerrar sesión'}</button>
         </div>
       </header>
 
-      ${!esSrv?`
+      ${!esSrv ? `
         <div class="form-card">
           <div class="field"><label>Hora inicio</label><input type="time" id="fHora" value="16:00" step="300"></div>
           <div class="field"><label>Duración (min)</label><input type="number" id="fDur" value="60" min="15" step="15"></div>
           <button class="btn-submit" id="btnSolicitar">Solicitar</button>
-          <div class="form-msg" id="fMsg" style="color:#f87171"></div>
+          <div class="form-msg" id="fMsg"></div>
         </div>
-      `:`
+      ` : `
         <div class="srv-bar">
           <button class="btn btn-primary" id="btnRefresh">↻ Actualizar</button>
           <button class="btn btn-ghost" id="btnToCliente">Vista cliente</button>
         </div>
       `}
 
-      <div class="msg-bar ${msg.text?'show '+(msg.type||''):''}" id="msgBar">${msg.text||''}</div>
+      <div class="msg-bar ${msg.text ? 'show '+(msg.type||'') : ''}" id="msgBar">${msg.text||''}</div>
 
       <div class="day-view">
         <div class="day-scroll">
@@ -480,7 +468,7 @@ async function renderApp(){
         </div>
       </div>
 
-      ${esSrv?`
+      ${esSrv ? `
         <div class="lists-grid">
           <div class="list-card">
             <h3><span class="dot dot-pend"></span> Pendientes</h3>
@@ -495,126 +483,131 @@ async function renderApp(){
           <h3><span class="dot dot-rech"></span> Rechazadas</h3>
           <div id="lRech"><div class="empty">Cargando…</div></div>
         </div>
-      `:''}
+      ` : ''}
     </div>`;
 
-  $('fechaPick').onchange = e=>{ fecha=e.target.value; msg={text:'',type:''}; renderApp(); };
-  $('btnSalir').onclick = ()=>{
-    msg={text:'',type:''};
-    if(modo==='servidor'){
-      desuscribir(); modo='login'; srvPin='';
-      ss.removeItem('srvPin'); ss.removeItem('modo'); ss.removeItem('cliente');
-      renderLogin();
-    } else {
-      modo='login'; cliente={nombre:'',ci:''};
-      ss.removeItem('modo'); ss.removeItem('cliente');
-      renderLogin();
-    }
+  /* Event listeners */
+  $('fechaPick').onchange = e => { fecha = e.target.value; msg = {text:'',type:''}; renderApp(); };
+  $('btnSalir').onclick = () => {
+    msg = {text:'', type:''};
+    desuscribir();
+    modo = 'login'; srvPin = ''; cliente = {nombre:'', ci:''};
+    ss.removeItem('modo'); ss.removeItem('srvPin'); ss.removeItem('cliente');
+    renderLogin();
   };
   if(!esSrv){
     $('btnSolicitar').onclick = solicitar;
   } else {
-    $('btnRefresh').onclick   = ()=>renderApp();
-    $('btnToCliente').onclick = ()=>{desuscribir();modo='cliente';renderApp();};
+    $('btnRefresh').onclick   = () => renderApp();
+    $('btnToCliente').onclick = () => { modo = 'cliente'; cliente = {nombre:'',ci:''}; ss.setItem('modo','cliente'); ss.removeItem('cliente'); renderApp(); };
     $('btnCheck').onclick     = verificarLlegada;
-    if($('btnNotif')) $('btnNotif').onclick = async()=>{await pedirPermiso();renderApp();};
-    // Actualizar badge cuando cambie el estado de conexión
+    if($('btnNotif')) $('btnNotif').onclick = async () => { await pedirPermiso(); renderApp(); };
     setTimeout(updateRtBadge, 100);
   }
 
+  /* Cargar datos */
   loader(true);
   try {
     const reservas = await fetchReservas(fecha);
     renderDay(reservas);
     if(esSrv) renderListas(reservas);
   } catch(e){
-    showMsg('Error al conectar con la base de datos.','err');
+    showMsg('Error al conectar con la base de datos.', 'err');
   } finally {
     loader(false);
   }
 }
 
-/* ── Day ── */
+/* ── Day view ── */
 function renderDay(reservas){
-  const tLine=$('tLine'), hCol=$('hCol');
-  if(!tLine||!hCol) return;
-  tLine.style.height=((CLOSE-OPEN)*PX_MIN)+'px';
-  tLine.innerHTML=''; hCol.innerHTML='';
-  for(let h=Math.floor(OPEN/60);h<Math.floor(CLOSE/60);h++){
-    const lbl=document.createElement('div');
-    lbl.className='hour-label'; lbl.style.height=(60*PX_MIN)+'px';
-    lbl.textContent=pad(h)+':00'; hCol.appendChild(lbl);
-    const line=document.createElement('div');
-    line.className='line-hour'+(h%2===0?' prominent':'');
-    line.style.top=((h*60-OPEN)*PX_MIN)+'px'; tLine.appendChild(line);
+  const tLine = $('tLine'), hCol = $('hCol');
+  if(!tLine || !hCol) return;
+  tLine.style.height = ((CLOSE - OPEN) * PX_MIN) + 'px';
+  tLine.innerHTML = ''; hCol.innerHTML = '';
+
+  for(let h = Math.floor(OPEN/60); h < Math.floor(CLOSE/60); h++){
+    const lbl = document.createElement('div');
+    lbl.className = 'hour-label';
+    lbl.style.height = (60 * PX_MIN) + 'px';
+    lbl.textContent = pad(h) + ':00';
+    hCol.appendChild(lbl);
+    const line = document.createElement('div');
+    line.className = 'line-hour' + (h % 2 === 0 ? ' prominent' : '');
+    line.style.top = ((h*60 - OPEN) * PX_MIN) + 'px';
+    tLine.appendChild(line);
   }
-  const esSrv=modo==='servidor';
-  reservas.forEach(r=>{
-    const top=(r.inicio-OPEN)*PX_MIN, height=Math.max(r.duracion*PX_MIN,30);
-    const esProp=cliente.ci&&cliente.ci===r.ci&&cliente.nombre===r.cliente;
-    const canEdit=(r.estado==='pendiente'&&(esProp||esSrv))||(r.estado==='reservado'&&esSrv);
-    const canApprove=esSrv&&r.estado==='pendiente';
-    const cls=r.estado==='pendiente'?'res-pend':r.estado==='reservado'?'res-res':'res-rech';
-    const bc=r.estado==='pendiente'?'badge-p':r.estado==='reservado'?'badge-r':'badge-x';
-    const bt=r.estado==='pendiente'?'Pendiente':r.estado==='reservado'?'Reservado':'Rechazado';
-    const div=document.createElement('div');
-    div.className=`res-block ${cls}`;
-    div.style.cssText=`top:${top}px;height:${height}px`;
-    div.innerHTML=`
+
+  const esSrv = modo === 'servidor';
+  reservas.forEach(r => {
+    const top    = (r.inicio - OPEN) * PX_MIN;
+    const height = Math.max(r.duracion * PX_MIN, 30);
+    const esProp = cliente.ci && cliente.ci === r.ci && cliente.nombre === r.cliente;
+    const canEdit    = esSrv || (esProp && r.estado === 'pendiente');
+    const canApprove = esSrv && r.estado === 'pendiente';
+    const cls = r.estado==='pendiente' ? 'res-pend' : r.estado==='reservado' ? 'res-res' : 'res-rech';
+    const bc  = r.estado==='pendiente' ? 'badge-p'  : r.estado==='reservado' ? 'badge-r' : 'badge-x';
+    const bt  = r.estado==='pendiente' ? 'Pendiente' : r.estado==='reservado' ? 'Reservado' : 'Rechazado';
+
+    const div = document.createElement('div');
+    div.className = `res-block ${cls}`;
+    div.style.cssText = `top:${top}px;height:${height}px`;
+    div.innerHTML = `
       <div class="r-name">${r.cliente}</div>
       <div class="r-meta">${fmt(r.inicio)} – ${fmt(r.inicio+r.duracion)} · CI ${r.ci||'—'}</div>
       <span class="r-badge ${bc}">${bt}</span>
       <div class="r-actions" id="ra-${r.id}"></div>`;
-    const ac=div.querySelector(`#ra-${r.id}`);
+
+    const ac = div.querySelector(`#ra-${r.id}`);
     if(canApprove){
-      ac.append(mkBtn('ra-btn ra-approve','✓ Aprobar',()=>aprobar(r.id)));
-      ac.append(mkBtn('ra-btn ra-reject','✗ Rechazar',()=>rechazar(r.id)));
+      ac.append(mkBtn('ra-btn ra-approve','✓ Aprobar', () => aprobar(r.id)));
+      ac.append(mkBtn('ra-btn ra-reject', '✗ Rechazar',() => rechazar(r.id)));
     }
-    if(canEdit) ac.append(mkBtn('ra-btn ra-edit','Editar',()=>editar(r)));
-    if(esSrv)   ac.append(mkBtn('ra-btn ra-delete','🗑',()=>eliminar(r)));
+    if(canEdit)  ac.append(mkBtn('ra-btn ra-edit',  'Editar', () => editar(r)));
+    if(esSrv)    ac.append(mkBtn('ra-btn ra-delete', '🗑',     () => eliminar(r)));
     tLine.appendChild(div);
   });
 }
 
 /* ── Listas ── */
 function renderListas(reservas){
-  const pend=reservas.filter(r=>r.estado==='pendiente');
-  const res =reservas.filter(r=>r.estado==='reservado');
-  const rech=reservas.filter(r=>r.estado==='rechazado');
-  fill('lPend',pend,r=>{
-    const d=mkItem(r);
+  const pend = reservas.filter(r => r.estado === 'pendiente');
+  const res  = reservas.filter(r => r.estado === 'reservado');
+  const rech = reservas.filter(r => r.estado === 'rechazado');
+
+  fill('lPend', pend, r => {
+    const d = mkItem(r);
     d.querySelector('.ri-actions').append(
-      mkBtn('btn btn-success ra-btn','✓ Aprobar',()=>aprobar(r.id)),
-      mkBtn('btn btn-warn ra-btn','✗ Rechazar',()=>rechazar(r.id)),
-      mkBtn('btn btn-primary ra-btn','Editar',()=>editar(r)),
-      mkBtn('btn btn-danger ra-btn','Eliminar',()=>eliminar(r))
+      mkBtn('btn btn-success ra-btn','✓ Aprobar', () => aprobar(r.id)),
+      mkBtn('btn btn-warn ra-btn',  '✗ Rechazar',() => rechazar(r.id)),
+      mkBtn('btn btn-primary ra-btn','Editar',   () => editar(r)),
+      mkBtn('btn btn-danger ra-btn', 'Eliminar', () => eliminar(r))
     ); return d;
   });
-  fill('lRes',res,r=>{
-    const d=mkItem(r);
+  fill('lRes', res, r => {
+    const d = mkItem(r);
     d.querySelector('.ri-actions').append(
-      mkBtn('btn btn-primary ra-btn','Editar',()=>editar(r)),
-      mkBtn('btn btn-danger ra-btn','Eliminar',()=>eliminar(r))
+      mkBtn('btn btn-primary ra-btn','Editar',  () => editar(r)),
+      mkBtn('btn btn-danger ra-btn', 'Eliminar',() => eliminar(r))
     ); return d;
   });
-  fill('lRech',rech,r=>{
-    const d=mkItem(r);
-    d.querySelector('.ri-actions').append(mkBtn('btn btn-danger ra-btn','Eliminar',()=>eliminar(r)));
+  fill('lRech', rech, r => {
+    const d = mkItem(r);
+    d.querySelector('.ri-actions').append(mkBtn('btn btn-danger ra-btn','Eliminar',() => eliminar(r)));
     return d;
   });
 }
 
-function fill(id,items,builder){
-  const el=$(id); if(!el) return;
-  el.innerHTML='';
-  if(!items.length){el.innerHTML='<div class="empty">Sin registros</div>';return;}
-  items.forEach(r=>el.appendChild(builder(r)));
+function fill(id, items, builder){
+  const el = $(id); if(!el) return;
+  el.innerHTML = '';
+  if(!items.length){ el.innerHTML = '<div class="empty">Sin registros</div>'; return; }
+  items.forEach(r => el.appendChild(builder(r)));
 }
 function mkItem(r){
-  const bc=r.estado==='pendiente'?'badge-p':r.estado==='reservado'?'badge-r':'badge-x';
-  const bt=r.estado==='pendiente'?'Pendiente':r.estado==='reservado'?'Reservado':'Rechazado';
-  const div=document.createElement('div'); div.className='res-item';
-  div.innerHTML=`
+  const bc = r.estado==='pendiente' ? 'badge-p' : r.estado==='reservado' ? 'badge-r' : 'badge-x';
+  const bt = r.estado==='pendiente' ? 'Pendiente' : r.estado==='reservado' ? 'Reservado' : 'Rechazado';
+  const div = document.createElement('div'); div.className = 'res-item';
+  div.innerHTML = `
     <div>
       <div class="ri-name">${r.cliente}</div>
       <div class="ri-sub">CI: ${r.ci} · ${fmt(r.inicio)} – ${fmt(r.inicio+r.duracion)}</div>
@@ -623,10 +616,10 @@ function mkItem(r){
     <div class="ri-actions"></div>`;
   return div;
 }
-function mkBtn(cls,txt,cb){
-  const b=document.createElement('button');
-  b.className=cls; b.textContent=txt;
-  b.onclick=e=>{e.stopPropagation();cb();};
+function mkBtn(cls, txt, cb){
+  const b = document.createElement('button');
+  b.className = cls; b.textContent = txt;
+  b.onclick = e => { e.stopPropagation(); cb(); };
   return b;
 }
 
@@ -634,136 +627,141 @@ function mkBtn(cls,txt,cb){
    ACCIONES
 ══════════════════════════════════════════════ */
 async function solicitar(){
-  const hora=$('fHora').value, dur=parseInt($('fDur').value,10);
-  const msgEl=$('fMsg'); msgEl.textContent=''; msgEl.style.color='#f87171';
-  if(!hora){msgEl.textContent='Seleccione hora.';return;}
-  if(isNaN(dur)||dur<15){msgEl.textContent='Duración mínima 15 min.';return;}
-  const inicio=t2m(hora);
-  if(inicio<OPEN||inicio+dur>CLOSE){msgEl.textContent='Fuera de horario (13:00–24:00).';return;}
-  if(fecha===today()&&inicio<nowMin()){msgEl.textContent='No puede reservar en el pasado.';return;}
-  const btn=$('btnSolicitar'); btn.disabled=true; loader(true);
+  const hora = $('fHora').value, dur = parseInt($('fDur').value, 10);
+  const msgEl = $('fMsg');
+  msgEl.textContent = ''; msgEl.style.color = '#f87171';
+  if(!hora){ msgEl.textContent = 'Seleccione hora.'; return; }
+  if(isNaN(dur) || dur < 15){ msgEl.textContent = 'Duración mínima 15 min.'; return; }
+  const inicio = t2m(hora);
+  if(inicio < OPEN || inicio + dur > CLOSE){ msgEl.textContent = 'Fuera de horario (13:00–24:00).'; return; }
+  if(fecha === today() && inicio < nowMin()){ msgEl.textContent = 'No puede reservar en el pasado.'; return; }
+
+  const btn = $('btnSolicitar'); btn.disabled = true; loader(true);
   try {
-    const existentes=await fetchReservas(fecha);
-    if(overlap(inicio,dur,existentes)){msgEl.textContent='Horario no disponible.';return;}
-    await insertReserva({id:uid(),fecha,inicio,duracion:dur,cliente:cliente.nombre,ci:cliente.ci,estado:'pendiente',creado:Date.now()});
-    msgEl.style.color='#86efac';
-    msgEl.textContent='✓ Solicitud enviada — pendiente de aprobación.';
-    setTimeout(()=>renderApp(),800);
+    const existentes = await fetchReservas(fecha);
+    if(overlap(inicio, dur, existentes)){ msgEl.textContent = 'Horario no disponible.'; return; }
+    await insertReserva({
+      id: uid(), fecha, inicio, duracion: dur,
+      cliente: cliente.nombre, ci: cliente.ci,
+      estado: 'pendiente', creado: Date.now()
+    });
+    msgEl.style.color = '#86efac';
+    msgEl.textContent = '✓ Solicitud enviada — pendiente de aprobación.';
+    setTimeout(() => { msg = {text:'',type:''}; renderApp(); }, 1200);
   } catch(e){
-    msgEl.textContent='Error al enviar. Verifica tu conexión.';
+    console.error('solicitar', e);
+    msgEl.textContent = 'Error al enviar: ' + (e.message || 'verifica tu conexión.');
   } finally {
-    loader(false); if($('btnSolicitar')) $('btnSolicitar').disabled=false;
+    loader(false);
+    const b2 = $('btnSolicitar'); if(b2) b2.disabled = false;
   }
 }
 
 async function aprobar(id){
   loader(true);
   try {
-    const reservas=await fetchReservas(fecha);
-    const r=reservas.find(x=>x.id===id); if(!r) return;
-    if(overlap(r.inicio,r.duracion,reservas,id))
-      if(!confirm('Solapamiento. ¿Aprobar igualmente?')){loader(false);return;}
-    await rpc('srv_aprobar',{p_pin:srvPin, p_id:id});
-    showMsg('Reserva aprobada.','ok');
-  } catch(e){showMsg(e.message||'Error al aprobar.','err');}
-  finally{loader(false);renderApp();}
+    const reservas = await fetchReservas(fecha);
+    const r = reservas.find(x => x.id === id); if(!r) return;
+    if(overlap(r.inicio, r.duracion, reservas, id))
+      if(!confirm('Solapamiento. ¿Aprobar igualmente?')){ loader(false); return; }
+    await rpc('srv_aprobar', {p_pin: srvPin, p_id: id});
+    showMsg('Reserva aprobada.', 'ok');
+  } catch(e){ showMsg(e.message || 'Error al aprobar.', 'err'); }
+  finally { loader(false); renderApp(); }
 }
 
 async function rechazar(id){
   if(!confirm('¿Rechazar esta reserva?')) return;
   loader(true);
   try {
-    await rpc('srv_rechazar',{p_pin:srvPin, p_id:id});
-    showMsg('Reserva rechazada.','err');
-  } catch(e){showMsg(e.message||'Error al rechazar.','err');}
-  finally{loader(false);renderApp();}
+    await rpc('srv_rechazar', {p_pin: srvPin, p_id: id});
+    showMsg('Reserva rechazada.', 'err');
+  } catch(e){ showMsg(e.message || 'Error al rechazar.', 'err'); }
+  finally { loader(false); renderApp(); }
 }
 
 async function editar(r){
-  const esProp=cliente.ci&&cliente.ci===r.ci&&cliente.nombre===r.cliente;
-  const puede=(r.estado==='pendiente'&&(esProp||modo==='servidor'))||(r.estado==='reservado'&&modo==='servidor');
-  if(!puede){alert('Sin permiso para editar.');return;}
-  const nh=prompt('Nueva hora inicio (HH:MM):',fmt(r.inicio)); if(!nh) return;
-  const nd=prompt('Nueva duración (min):',String(r.duracion)); if(!nd) return;
-  const inicio=t2m(nh), dur=parseInt(nd,10);
-  if(isNaN(dur)||dur<15){alert('Duración inválida.');return;}
-  if(inicio<OPEN||inicio+dur>CLOSE){alert('Fuera de horario (13:00–24:00).');return;}
+  // Solo el servidor puede editar (los clientes no tienen el PIN para la RPC)
+  if(modo !== 'servidor'){ alert('Solo el servidor puede editar reservas.'); return; }
+  const nh = prompt('Nueva hora inicio (HH:MM):', fmt(r.inicio)); if(!nh) return;
+  const nd = prompt('Nueva duración (min):', String(r.duracion)); if(!nd) return;
+  const inicio = t2m(nh), dur = parseInt(nd, 10);
+  if(isNaN(dur) || dur < 15){ alert('Duración inválida.'); return; }
+  if(inicio < OPEN || inicio + dur > CLOSE){ alert('Fuera de horario (13:00–24:00).'); return; }
   loader(true);
   try {
-    const reservas=await fetchReservas(fecha);
-    if(overlap(inicio,dur,reservas,r.id))
-      if(!confirm('Solapamiento. ¿Aplicar igualmente?')){loader(false);return;}
-    // Servidor: pasa srvPin; cliente: pasa SERVER_PIN como señal
-    // La BD distingue por p_ci: null=servidor, valor=cliente
-    const esCliente = modo==='cliente';
-    await rpc('srv_editar',{
-      p_pin:     esCliente ? srvPin : srvPin,   // siempre srvPin (solo servidor edita)
-      p_id:      r.id,
-      p_inicio:  inicio,
-      p_duracion:dur,
-      p_ci:      esCliente ? cliente.ci : null  // null → permisos de servidor
-    });
-    showMsg('Reserva actualizada.','ok');
-  } catch(e){showMsg(e.message||'Error al editar.','err');}
-  finally{loader(false);renderApp();}
+    const reservas = await fetchReservas(fecha);
+    if(overlap(inicio, dur, reservas, r.id))
+      if(!confirm('Solapamiento. ¿Aplicar igualmente?')){ loader(false); return; }
+    await rpc('srv_editar', {p_pin: srvPin, p_id: r.id, p_inicio: inicio, p_duracion: dur, p_ci: null});
+    showMsg('Reserva actualizada.', 'ok');
+  } catch(e){ showMsg(e.message || 'Error al editar.', 'err'); }
+  finally { loader(false); renderApp(); }
 }
 
 async function eliminar(r){
   if(!confirm(`¿Eliminar la reserva de ${r.cliente} (${fmt(r.inicio)}–${fmt(r.inicio+r.duracion)})?`)) return;
   loader(true);
   try {
-    await rpc('srv_eliminar',{p_pin:srvPin, p_id:r.id});
-    showMsg('Reserva eliminada.','err');
-  } catch(e){showMsg(e.message||'Error al eliminar.','err');}
-  finally{loader(false);renderApp();}
+    await rpc('srv_eliminar', {p_pin: srvPin, p_id: r.id});
+    showMsg('Reserva eliminada.', 'ok');
+  } catch(e){ showMsg(e.message || 'Error al eliminar.', 'err'); }
+  finally { loader(false); renderApp(); }
 }
 
 async function verificarLlegada(){
-  if(fecha!==today()){showMsg('Seleccione la fecha de hoy.','err');renderApp();return;}
+  if(fecha !== today()){ showMsg('Seleccione la fecha de hoy.', 'err'); renderApp(); return; }
   loader(true);
-  const reservas=await fetchReservas(fecha);
+  const reservas = await fetchReservas(fecha);
   loader(false);
-  const ahora=nowMin();
-  const act=reservas.find(r=>r.estado==='reservado'&&ahora>=r.inicio&&ahora<r.inicio+r.duracion);
-  if(act) showMsg(`✓ Mesa ocupada: ${act.cliente} (CI ${act.ci}) · ${fmt(act.inicio)}–${fmt(act.inicio+act.duracion)}`,'ok');
-  else    showMsg('Sin reserva activa en este momento.','');
+  const ahora = nowMin();
+  const act = reservas.find(r => r.estado === 'reservado' && ahora >= r.inicio && ahora < r.inicio + r.duracion);
+  if(act) showMsg(`✓ Mesa ocupada: ${act.cliente} (CI ${act.ci}) · ${fmt(act.inicio)}–${fmt(act.inicio+act.duracion)}`, 'ok');
+  else    showMsg('Sin reserva activa en este momento.', '');
   renderApp();
 }
 
-function showMsg(text,type){msg={text,type};}
+function showMsg(text, type){ msg = {text, type}; }
 
-/* Offline */
-const syncOffline=()=>$('offlineBadge').classList.toggle('show',!navigator.onLine);
-window.addEventListener('online',syncOffline); window.addEventListener('offline',syncOffline); syncOffline();
+/* ── Offline ── */
+const syncOffline = () => $('offlineBadge').classList.toggle('show', !navigator.onLine);
+window.addEventListener('online', syncOffline);
+window.addEventListener('offline', syncOffline);
+syncOffline();
 
-/* Service Worker */
-let newWorker=null;
+/* ── Service Worker ── */
+let newWorker = null;
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('./sw.js').then(reg=>{
-      reg.addEventListener('updatefound',()=>{
-        newWorker=reg.installing;
-        newWorker.addEventListener('statechange',()=>{
-          if(newWorker.state==='installed'&&navigator.serviceWorker.controller)
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      reg.addEventListener('updatefound', () => {
+        newWorker = reg.installing;
+        newWorker.addEventListener('statechange', () => {
+          if(newWorker.state === 'installed' && navigator.serviceWorker.controller)
             $('updateBanner').classList.add('show');
         });
       });
-      $('btnUpdate').addEventListener('click',()=>{if(newWorker)newWorker.postMessage('SKIP_WAITING');});
-      navigator.serviceWorker.addEventListener('controllerchange',()=>window.location.reload());
-      reg.update().catch(()=>{});
-    }).catch(()=>{});
+      $('btnUpdate').addEventListener('click', () => { if(newWorker) newWorker.postMessage('SKIP_WAITING'); });
+      navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload());
+      reg.update().catch(() => {});
+    }).catch(() => {});
   });
 }
 
-// Boot — restaurar sesión si existe
+/* ── Boot ── */
 if(modo === 'servidor' && srvPin){
-  suscribir();   // reconectar Realtime
+  suscribir();
   pedirPermiso();
   renderApp();
 } else if(modo === 'cliente' && cliente.nombre){
   renderApp();
 } else {
+  // Limpiar cualquier estado corrupto y mostrar login
+  ss.clear();
+  modo = 'login'; srvPin = ''; cliente = {nombre:'', ci:''};
   renderLogin();
 }
+
+</script>
 </body>
 </html>
