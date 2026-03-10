@@ -273,16 +273,35 @@ let rtChan  = null;
 let srvPin  = '';   // se guarda en memoria al hacer login como servidor
 
 /* ── Realtime ── */
+let rtStatus = 'off'; // 'off' | 'connecting' | 'ok' | 'error'
+
 function suscribir(){
   if(rtChan) db.removeChannel(rtChan);
+  rtStatus = 'connecting';
   rtChan = db.channel('reservas-changes')
     .on('postgres_changes',{event:'*',schema:'public',table:'reservas'}, payload => {
       renderApp();
       if(payload.eventType==='INSERT') pushNotif(payload.new);
     })
-    .subscribe();
+    .subscribe(status => {
+      if(status === 'SUBSCRIBED')      { rtStatus='ok';         updateRtBadge(); }
+      else if(status === 'CLOSED' ||
+              status === 'CHANNEL_ERROR'){ rtStatus='error';    updateRtBadge(); }
+    });
 }
-function desuscribir(){ if(rtChan){db.removeChannel(rtChan);rtChan=null;} }
+function desuscribir(){ if(rtChan){db.removeChannel(rtChan);rtChan=null;} rtStatus='off'; }
+
+function updateRtBadge(){
+  const el = document.getElementById('rtBadge');
+  if(!el) return;
+  const map = {
+    connecting: { label:'Conectando…', dot:'#d97706' },
+    ok:         { label:'En vivo',     dot:'#2ea84e' },
+    error:      { label:'Sin Realtime',dot:'#e53e3e' },
+  };
+  const s = map[rtStatus] || map.ok;
+  el.innerHTML = `${s.label}<span class="rt-dot" style="background:${s.dot}"></span>`;
+}
 
 async function pedirPermiso(){
   if('Notification' in window && Notification.permission==='default')
@@ -344,11 +363,14 @@ async function renderApp(){
           <input type="date" class="date-pick" id="fechaPick" value="${fecha}">
           <span class="badge-role">${esSrv?'🔧 Servidor':'👤 '+cliente.nombre}</span>
           ${esSrv?`
-            <span class="badge-role" style="font-size:.72rem;display:inline-flex;align-items:center;gap:4px">
-              En vivo<span class="rt-dot"></span>
+            <span class="badge-role" id="rtBadge" style="font-size:.72rem;display:inline-flex;align-items:center;gap:4px">
+              Conectando…<span class="rt-dot" style="background:#d97706"></span>
             </span>
             <button class="btn btn-gold" id="btnCheck">Verificar llegada</button>
-            ${!notifOk?`<button class="btn btn-gold" id="btnNotif">🔔 Activar avisos</button>`:''}
+            ${!notifOk
+              ? `<button class="btn btn-gold" id="btnNotif">🔔 Activar avisos</button>`
+              : `<span class="badge-role" style="font-size:.72rem">🔔 Avisos activos</span>`
+            }
           `:''}
           <button class="btn btn-ghost" id="btnSalir">${esSrv?'Salir':'Cerrar sesión'}</button>
         </div>
@@ -408,6 +430,8 @@ async function renderApp(){
     $('btnToCliente').onclick = ()=>{desuscribir();modo='cliente';renderApp();};
     $('btnCheck').onclick     = verificarLlegada;
     if($('btnNotif')) $('btnNotif').onclick = async()=>{await pedirPermiso();renderApp();};
+    // Actualizar badge cuando cambie el estado de conexión
+    setTimeout(updateRtBadge, 100);
   }
 
   loader(true);
