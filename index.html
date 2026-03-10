@@ -6,12 +6,12 @@
 <title>Geisha Bar — Reservas de Billar</title>
 
 <!-- PWA -->
-<link rel="manifest" href="/manifest.json">
+<link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#c9a84c">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Geisha Bar">
-<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
 
 <!-- Supabase SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -222,7 +222,7 @@ const SUPABASE_URL  = 'https://pvoafqlwevbmfmdbdjsx.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB2b2FmcWx3ZXZibWZtZGJkanN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNDIyOTgsImV4cCI6MjA4ODYxODI5OH0.xdv1XQiafCrVWs1ccz1K_P472pNtB-rvlQ5fdQUd51U';
 /* ══════════════════════════════════════════════ */
 
-const SERVER_PIN = '1234';
+const SERVER_PIN = '0213';
 const OPEN       = 13 * 60;
 const CLOSE      = 24 * 60;
 const PX_MIN     = 1;
@@ -311,7 +311,7 @@ function pushNotif(r){
   if(!('Notification' in window)||Notification.permission!=='granted') return;
   new Notification('🎱 Nueva solicitud — Geisha Bar',{
     body:`${r.cliente} (CI ${r.ci})  ·  ${fmt(r.inicio)}–${fmt(r.inicio+r.duracion)}`,
-    icon:'/icon-192.png', tag:'res-'+r.id, renotify:true
+    icon:'./icon-192.png', tag:'res-'+r.id, renotify:true
   });
 }
 
@@ -323,10 +323,10 @@ function renderLogin(){
   $('root').innerHTML = `
     <div class="login-wrap">
       <div class="login-card">
-        <div class="login-logo"><img src="/icon-192.png" style="width:72px;height:72px;object-fit:contain;border-radius:16px" alt="Geisha Bar"></div>
+        <div class="login-logo"><img src="./icon-192.png" style="width:72px;height:72px;object-fit:contain;border-radius:16px" alt="Geisha Bar"></div>
         <div class="login-sub">Reserva tu mesa en segundos</div>
         <div class="login-field"><label>Nombre</label><input id="ln" placeholder="Tu nombre" autocomplete="given-name"></div>
-        <div class="login-field"><label>CI</label><input id="lci" placeholder="Cédula de identidad" autocomplete="off"></div>
+        <div class="login-field"><label>CI</label><input id="lci" placeholder="Carnet de identidad" autocomplete="off"></div>
         <div class="login-btns">
           <button class="btn-login-main" id="btnIng">Ingresar</button>
           <button class="btn-login-srv" id="btnSrv">Servidor</button>
@@ -358,7 +358,7 @@ async function renderApp(){
   $('root').innerHTML = `
     <div class="app">
       <header class="app-header">
-        <div class="logo"><img src="/icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:6px;vertical-align:middle;margin-right:8px" alt="">Geisha Bar<span>/ Reservas</span></div>
+        <div class="logo"><img src="./icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:6px;vertical-align:middle;margin-right:8px" alt="">Geisha Bar<span>/ Reservas</span></div>
         <div class="header-right">
           <input type="date" class="date-pick" id="fechaPick" value="${fecha}">
           <span class="badge-role">${esSrv?'🔧 Servidor':'👤 '+cliente.nombre}</span>
@@ -652,7 +652,7 @@ window.addEventListener('online',syncOffline); window.addEventListener('offline'
 let newWorker=null;
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('/sw.js').then(reg=>{
+    navigator.serviceWorker.register('./sw.js').then(reg=>{
       reg.addEventListener('updatefound',()=>{
         newWorker=reg.installing;
         newWorker.addEventListener('statechange',()=>{

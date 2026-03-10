@@ -5,10 +5,10 @@
 
 const CACHE_NAME  = 'billar-club-v1';
 const CACHE_URLS  = [
-  '/index.html',
-  '/manifest.json',
-  '/icon-192.png',
-  '/icon-512.png',
+  './index.html',
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png',
   'https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600;700&display=swap'
 ];
 
@@ -19,10 +19,10 @@ self.addEventListener('install', event => {
       // Las Google Fonts pueden fallar en modo offline en la instalación;
       // usamos addAll solo con recursos locales y capturamos el resto.
       return cache.addAll([
-        '/index.html',
-        '/manifest.json',
-        '/icon-192.png',
-        '/icon-512.png'
+        './index.html',
+        './manifest.json',
+        './icon-192.png',
+        './icon-512.png'
       ]).then(() => {
         // Intentar cachear fuentes (no crítico si falla)
         return cache.add('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600;700&display=swap')
@@ -73,7 +73,7 @@ self.addEventListener('fetch', event => {
         .catch(() => {
           // Offline y no en caché: devolver index.html como fallback
           if (event.request.destination === 'document') {
-            return caches.match('/index.html');
+            return caches.match('./index.html');
           }
         });
     })
