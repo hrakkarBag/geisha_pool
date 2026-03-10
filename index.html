@@ -1,370 +1,186 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Billar Club — Reservas</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Geisha Bar — Reservas de Billar</title>
 
 <!-- PWA -->
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#c9a84c">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Billar Club">
+<meta name="apple-mobile-web-app-title" content="Geisha Bar">
 <link rel="apple-touch-icon" href="/icon-192.png">
+
+<!-- Supabase SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <!-- Fonts -->
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <style>
-/* ─── Variables ─────────────────────────────────── */
 :root{
-  --bg:        #0d1117;
-  --surface:   #161b22;
-  --surface2:  #1e2530;
-  --border:    #2a3242;
-  --felt:      #1a3a2a;
-  --gold:      #c9a84c;
-  --gold-dim:  #8a6c2a;
-  --green:     #2ea84e;
-  --red:       #e53e3e;
-  --amber:     #d97706;
-  --blue:      #3b82f6;
-  --text:      #e8edf4;
-  --muted:     #7a8899;
-  --pend-bg:   #2d1f0a;
-  --pend-b:    #d97706;
-  --res-bg:    #0b2416;
-  --res-b:     #2ea84e;
-  --rech-bg:   #1f0b0b;
-  --rech-b:    #e53e3e;
-  --radius:    14px;
-  --r-sm:      8px;
-  --r-pill:    999px;
-  --shadow:    0 8px 32px rgba(0,0,0,0.4);
-  --trans:     all .2s ease;
+  --bg:#0d1117;--surface:#161b22;--surface2:#1e2530;--border:#2a3242;
+  --felt:#1a3a2a;--gold:#c9a84c;--gold-dim:#8a6c2a;
+  --green:#2ea84e;--red:#e53e3e;--amber:#d97706;--blue:#3b82f6;
+  --text:#e8edf4;--muted:#7a8899;
+  --pend-bg:#2d1f0a;--pend-b:#d97706;
+  --res-bg:#0b2416;--res-b:#2ea84e;
+  --rech-bg:#1f0b0b;--rech-b:#e53e3e;
+  --radius:14px;--r-sm:8px;--r-pill:999px;
+  --shadow:0 8px 32px rgba(0,0,0,0.4);--trans:all .2s ease;
 }
-
-/* ─── Reset ─────────────────────────────────────── */
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
 body{
-  font-family:'DM Sans',sans-serif;
-  background:var(--bg);
-  color:var(--text);
-  min-height:100vh;
-  padding:12px;
+  font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);
+  min-height:100vh;padding:12px;
   background-image:
-    radial-gradient(circle at 20% 80%, rgba(26,58,42,0.18) 0%, transparent 50%),
-    radial-gradient(circle at 80% 10%, rgba(201,168,76,0.07) 0%, transparent 40%);
+    radial-gradient(circle at 20% 80%,rgba(26,58,42,.18) 0%,transparent 50%),
+    radial-gradient(circle at 80% 10%,rgba(201,168,76,.07) 0%,transparent 40%);
 }
+.app{max-width:960px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
 
-/* ─── Update banner ──────────────────────────────── */
-#updateBanner{
-  display:none;
-  position:fixed;
-  bottom:16px;
-  left:50%;
-  transform:translateX(-50%);
-  z-index:9999;
-  background:var(--felt);
-  border:1px solid var(--gold-dim);
-  color:var(--gold);
-  padding:10px 18px;
-  border-radius:var(--r-pill);
-  font-size:.85rem;
-  font-weight:600;
-  gap:12px;
-  align-items:center;
-  box-shadow:var(--shadow);
-  white-space:nowrap;
-}
-#updateBanner.show{display:flex}
-#updateBanner button{
-  background:var(--gold);
-  color:#000;
-  border:none;
-  padding:5px 12px;
-  border-radius:var(--r-pill);
-  cursor:pointer;
-  font-weight:700;
-  font-size:.82rem;
-  font-family:'DM Sans',sans-serif;
-}
-
-/* ─── App shell ──────────────────────────────────── */
-.app{
-  max-width:960px;
-  margin:0 auto;
-  display:flex;
-  flex-direction:column;
-  gap:14px;
-}
-
-/* ─── Header ─────────────────────────────────────── */
+/* Header */
 .app-header{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-  padding:14px 18px;
-  background:var(--surface);
-  border-radius:var(--radius);
-  border:1px solid var(--border);
-  flex-wrap:wrap;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:14px 18px;background:var(--surface);border-radius:var(--radius);
+  border:1px solid var(--border);flex-wrap:wrap;
 }
-.logo{
-  font-family:'DM Serif Display',serif;
-  font-size:clamp(1.1rem,3vw,1.5rem);
-  color:var(--gold);
-  white-space:nowrap;
-}
-.logo span{color:var(--muted);font-size:0.7em;font-family:'DM Sans',sans-serif;margin-left:6px}
+.logo{font-family:'DM Serif Display',serif;font-size:clamp(1.1rem,3vw,1.5rem);color:var(--gold);white-space:nowrap}
+.logo span{color:var(--muted);font-size:.7em;font-family:'DM Sans',sans-serif;margin-left:6px}
 .header-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 input[type=date].date-pick{
-  background:var(--surface2);
-  border:1px solid var(--border);
-  color:var(--text);
-  padding:8px 12px;
-  border-radius:var(--r-pill);
-  font-family:'DM Sans',sans-serif;
-  font-size:.9rem;
-  cursor:pointer;
-  transition:var(--trans);
+  background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  padding:8px 12px;border-radius:var(--r-pill);font-family:'DM Sans',sans-serif;
+  font-size:.9rem;cursor:pointer;transition:var(--trans);
 }
 input[type=date].date-pick:focus{outline:none;border-color:var(--gold)}
 .badge-role{
-  padding:6px 12px;
-  border-radius:var(--r-pill);
-  background:var(--felt);
-  color:var(--gold);
-  font-weight:700;
-  font-size:.82rem;
-  border:1px solid var(--gold-dim);
-  white-space:nowrap;
+  padding:6px 12px;border-radius:var(--r-pill);background:var(--felt);
+  color:var(--gold);font-weight:700;font-size:.82rem;border:1px solid var(--gold-dim);white-space:nowrap;
 }
 .btn{
-  padding:8px 14px;
-  border-radius:var(--r-pill);
-  border:none;
-  cursor:pointer;
-  font-family:'DM Sans',sans-serif;
-  font-weight:600;
-  font-size:.82rem;
-  transition:var(--trans);
-  white-space:nowrap;
+  padding:8px 14px;border-radius:var(--r-pill);border:none;cursor:pointer;
+  font-family:'DM Sans',sans-serif;font-weight:600;font-size:.82rem;transition:var(--trans);white-space:nowrap;
 }
-.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
-.btn-ghost:hover{color:var(--text);border-color:var(--muted)}
-.btn-danger{background:#7f1d1d;color:#fca5a5}
-.btn-danger:hover{background:var(--red);color:#fff}
-.btn-primary{background:var(--blue);color:#fff}
-.btn-primary:hover{background:#2563eb}
-.btn-gold{background:var(--felt);color:var(--gold);border:1px solid var(--gold-dim)}
-.btn-gold:hover{background:var(--gold);color:#000}
-.btn-success{background:#14532d;color:#86efac}
-.btn-success:hover{background:var(--green);color:#fff}
-.btn-warn{background:#451a03;color:#fde68a}
-.btn-warn:hover{background:var(--amber);color:#000}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}.btn-ghost:hover{color:var(--text);border-color:var(--muted)}
+.btn-danger{background:#7f1d1d;color:#fca5a5}.btn-danger:hover{background:var(--red);color:#fff}
+.btn-primary{background:var(--blue);color:#fff}.btn-primary:hover{background:#2563eb}
+.btn-gold{background:var(--felt);color:var(--gold);border:1px solid var(--gold-dim)}.btn-gold:hover{background:var(--gold);color:#000}
+.btn-success{background:#14532d;color:#86efac}.btn-success:hover{background:var(--green);color:#fff}
+.btn-warn{background:#451a03;color:#fde68a}.btn-warn:hover{background:var(--amber);color:#000}
 
-/* ─── Form ───────────────────────────────────────── */
+/* Form */
 .form-card{
-  background:var(--surface);
-  border:1px solid var(--border);
-  border-radius:var(--radius);
-  padding:16px 18px;
-  display:grid;
-  grid-template-columns:1fr 1fr auto;
-  gap:14px;
-  align-items:end;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px 18px;display:grid;grid-template-columns:1fr 1fr auto;gap:14px;align-items:end;
 }
 .form-card .form-msg{grid-column:1/-1;font-size:.85rem;margin-top:-6px}
 .field label{display:block;font-size:.8rem;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em}
 .field input{
-  width:100%;
-  background:var(--surface2);
-  border:1px solid var(--border);
-  color:var(--text);
-  padding:9px 12px;
-  border-radius:var(--r-sm);
-  font-family:'DM Sans',sans-serif;
-  font-size:.92rem;
-  transition:var(--trans);
+  width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  padding:9px 12px;border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:.92rem;transition:var(--trans);
 }
 .field input:focus{outline:none;border-color:var(--gold)}
 .btn-submit{
-  padding:10px 18px;
-  border-radius:var(--r-sm);
-  border:none;
-  background:var(--gold);
-  color:#0d0a00;
-  font-weight:700;
-  font-size:.9rem;
-  cursor:pointer;
-  font-family:'DM Sans',sans-serif;
-  transition:var(--trans);
-  align-self:end;
+  padding:10px 18px;border-radius:var(--r-sm);border:none;background:var(--gold);
+  color:#0d0a00;font-weight:700;font-size:.9rem;cursor:pointer;
+  font-family:'DM Sans',sans-serif;transition:var(--trans);align-self:end;
 }
 .btn-submit:hover{background:#e0bd6b}
+.btn-submit:disabled{opacity:.5;cursor:not-allowed}
 
-/* ─── Srv toolbar ────────────────────────────────── */
 .srv-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 
-/* ─── Day view ───────────────────────────────────── */
-.day-view{
-  border:1px solid var(--border);
-  border-radius:var(--radius);
-  overflow:hidden;
-  background:var(--surface);
-}
-/* Un único contenedor scrollable → horas y bloques se mueven juntos */
-.day-scroll{
-  display:grid;
-  grid-template-columns:56px 1fr;
-  overflow-y:auto;
-  max-height:min(660px,70vh);
-}
-.hours-col{
-  background:var(--surface2);
-  border-right:1px solid var(--border);
-  display:flex;
-  flex-direction:column;
-  /* sticky no aplica aquí; el scroll es compartido → se mueven juntos */
-}
+/* Day view — scroll sincronizado */
+.day-view{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--surface)}
+.day-scroll{display:grid;grid-template-columns:56px 1fr;overflow-y:auto;max-height:min(660px,70vh)}
+.hours-col{background:var(--surface2);border-right:1px solid var(--border);display:flex;flex-direction:column}
 .hour-label{
-  display:flex;
-  align-items:flex-start;
-  justify-content:flex-end;
-  padding:6px 8px 0 0;
-  color:var(--muted);
-  font-size:.75rem;
-  font-weight:600;
-  font-variant-numeric:tabular-nums;
-  height:60px;
-  border-bottom:1px solid rgba(255,255,255,0.04);
-  flex-shrink:0;
+  display:flex;align-items:flex-start;justify-content:flex-end;
+  padding:6px 8px 0 0;color:var(--muted);font-size:.75rem;font-weight:600;
+  font-variant-numeric:tabular-nums;height:60px;border-bottom:1px solid rgba(255,255,255,.04);flex-shrink:0;
 }
 .timeline{position:relative;background:var(--surface)}
-.line-hour{position:absolute;left:0;right:0;height:1px;background:rgba(255,255,255,0.04)}
-.line-hour.prominent{background:rgba(255,255,255,0.08)}
+.line-hour{position:absolute;left:0;right:0;height:1px;background:rgba(255,255,255,.04)}
+.line-hour.prominent{background:rgba(255,255,255,.08)}
 
-/* ─── Reservation blocks ─────────────────────────── */
+/* Blocks */
 .res-block{
-  position:absolute;left:6px;right:8px;
-  border-radius:10px;padding:8px 10px;
-  display:flex;flex-direction:column;gap:4px;
-  overflow:hidden;transition:filter .15s;
+  position:absolute;left:6px;right:8px;border-radius:10px;padding:8px 10px;
+  display:flex;flex-direction:column;gap:4px;overflow:hidden;transition:filter .15s;
 }
 .res-block:hover{filter:brightness(1.08)}
-.res-block .r-name{font-weight:700;font-size:.88rem;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.res-block .r-meta{font-size:.76rem;opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.res-block .r-actions{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.r-name{font-weight:700;font-size:.88rem;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r-meta{font-size:.76rem;opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r-actions{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
 .res-pend{background:var(--pend-bg);border-left:3px solid var(--pend-b);color:#fde68a}
-.res-res {background:var(--res-bg); border-left:3px solid var(--res-b); color:#bbf7d0}
+.res-res{background:var(--res-bg);border-left:3px solid var(--res-b);color:#bbf7d0}
 .res-rech{background:var(--rech-bg);border-left:3px solid var(--rech-b);color:#fca5a5;opacity:.6}
-.r-badge{
-  display:inline-block;padding:2px 7px;
-  border-radius:var(--r-pill);font-size:.7rem;font-weight:700;align-self:flex-start;
-}
+.r-badge{display:inline-block;padding:2px 7px;border-radius:var(--r-pill);font-size:.7rem;font-weight:700;align-self:flex-start}
 .badge-p{background:rgba(217,119,6,.25);color:#fbbf24}
 .badge-r{background:rgba(46,168,78,.25);color:#86efac}
 .badge-x{background:rgba(229,62,62,.25);color:#fca5a5}
+.ra-btn{padding:3px 8px;border-radius:var(--r-pill);border:none;cursor:pointer;font-size:.7rem;font-weight:700;font-family:'DM Sans',sans-serif;transition:var(--trans)}
+.ra-approve{background:rgba(46,168,78,.2);color:#86efac}.ra-approve:hover{background:var(--green);color:#fff}
+.ra-reject{background:rgba(229,62,62,.2);color:#fca5a5}.ra-reject:hover{background:var(--red);color:#fff}
+.ra-edit{background:rgba(59,130,246,.2);color:#93c5fd}.ra-edit:hover{background:var(--blue);color:#fff}
+.ra-delete{background:rgba(229,62,62,.12);color:#f87171}.ra-delete:hover{background:#7f1d1d;color:#fca5a5}
 
-.ra-btn{
-  padding:3px 8px;border-radius:var(--r-pill);border:none;
-  cursor:pointer;font-size:.7rem;font-weight:700;
-  font-family:'DM Sans',sans-serif;transition:var(--trans);
-}
-.ra-approve{background:rgba(46,168,78,.2);color:#86efac}
-.ra-approve:hover{background:var(--green);color:#fff}
-.ra-reject{background:rgba(229,62,62,.2);color:#fca5a5}
-.ra-reject:hover{background:var(--red);color:#fff}
-.ra-edit{background:rgba(59,130,246,.2);color:#93c5fd}
-.ra-edit:hover{background:var(--blue);color:#fff}
-.ra-delete{background:rgba(229,62,62,.12);color:#f87171}
-.ra-delete:hover{background:#7f1d1d;color:#fca5a5}
-
-/* ─── Lists ──────────────────────────────────────── */
+/* Lists */
 .lists-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.list-card{
-  background:var(--surface);border:1px solid var(--border);
-  border-radius:var(--radius);padding:14px;
-}
-.list-card h3{
-  font-size:.85rem;font-weight:700;text-transform:uppercase;
-  letter-spacing:.07em;color:var(--muted);margin-bottom:10px;
-  display:flex;align-items:center;gap:6px;
-}
-.list-card h3 .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
-.dot-pend{background:var(--pend-b)}
-.dot-res{background:var(--res-b)}
-.dot-rech{background:var(--rech-b)}
-.res-item{
-  display:flex;justify-content:space-between;align-items:center;
-  gap:10px;padding:10px 0;border-bottom:1px solid var(--border);
-}
+.list-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
+.list-card h3{font-size:.85rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+.dot-pend{background:var(--pend-b)}.dot-res{background:var(--res-b)}.dot-rech{background:var(--rech-b)}
+.res-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
 .res-item:last-child{border-bottom:none}
-.ri-info .ri-name{font-weight:700;font-size:.9rem}
-.ri-info .ri-sub{font-size:.78rem;color:var(--muted);margin-top:2px}
+.ri-name{font-weight:700;font-size:.9rem}
+.ri-sub{font-size:.78rem;color:var(--muted);margin-top:2px}
 .ri-actions{display:flex;gap:5px;flex-wrap:wrap;align-items:center;flex-shrink:0}
 .empty{text-align:center;color:var(--muted);font-size:.85rem;padding:12px 0}
 
-/* ─── Login ──────────────────────────────────────── */
-.login-wrap{
-  min-height:100vh;display:flex;align-items:center;
-  justify-content:center;padding:16px;
-}
-.login-card{
-  width:100%;max-width:420px;background:var(--surface);
-  border:1px solid var(--border);border-radius:20px;
-  padding:32px 28px;box-shadow:var(--shadow);
-}
-.login-logo{
-  font-family:'DM Serif Display',serif;font-size:2rem;
-  color:var(--gold);text-align:center;margin-bottom:4px;
-}
+/* Login */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+.login-card{width:100%;max-width:420px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:32px 28px;box-shadow:var(--shadow)}
+.login-logo{font-family:'DM Serif Display',serif;font-size:2rem;color:var(--gold);text-align:center;margin-bottom:4px}
 .login-sub{text-align:center;color:var(--muted);font-size:.9rem;margin-bottom:24px}
 .login-field{margin-bottom:14px}
 .login-field label{display:block;font-size:.8rem;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em}
-.login-field input{
-  width:100%;background:var(--surface2);border:1px solid var(--border);
-  color:var(--text);padding:10px 14px;border-radius:var(--r-sm);
-  font-family:'DM Sans',sans-serif;font-size:.95rem;transition:var(--trans);
-}
+.login-field input{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:.95rem;transition:var(--trans)}
 .login-field input:focus{outline:none;border-color:var(--gold)}
 .login-btns{display:flex;gap:10px;margin-top:6px}
-.login-btns button{
-  flex:1;padding:11px;border-radius:var(--r-sm);border:none;
-  cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:700;
-  font-size:.9rem;transition:var(--trans);
-}
-.btn-login-main{background:var(--gold);color:#0d0a00}
-.btn-login-main:hover{background:#e0bd6b}
-.btn-login-srv{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
-.btn-login-srv:hover{color:var(--text);border-color:var(--muted)}
+.login-btns button{flex:1;padding:11px;border-radius:var(--r-sm);border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:700;font-size:.9rem;transition:var(--trans)}
+.btn-login-main{background:var(--gold);color:#0d0a00}.btn-login-main:hover{background:#e0bd6b}
+.btn-login-srv{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}.btn-login-srv:hover{color:var(--text)}
 .login-msg{margin-top:10px;font-size:.85rem;color:#f87171;text-align:center;min-height:20px}
 
-/* ─── Msg bar ─────────────────────────────────────── */
-.msg-bar{
-  padding:10px 14px;border-radius:var(--r-sm);font-size:.87rem;
-  background:var(--felt);color:var(--gold);border:1px solid var(--gold-dim);display:none;
-}
+/* Msg bar */
+.msg-bar{padding:10px 14px;border-radius:var(--r-sm);font-size:.87rem;background:var(--felt);color:var(--gold);border:1px solid var(--gold-dim);display:none}
 .msg-bar.show{display:block}
 .msg-bar.err{background:#1f0b0b;color:#fca5a5;border-color:#7f1d1d}
 .msg-bar.ok{background:var(--res-bg);color:#86efac;border-color:#14532d}
 
-/* ─── Offline indicator ──────────────────────────── */
-#offlineBadge{
-  display:none;
-  position:fixed;top:12px;right:12px;
-  background:#1f0b0b;color:#fca5a5;
-  border:1px solid #7f1d1d;
-  padding:6px 12px;border-radius:var(--r-pill);
-  font-size:.78rem;font-weight:700;z-index:9998;
-}
-#offlineBadge.show{display:block}
+/* Loading */
+.loading{display:none;position:fixed;inset:0;background:rgba(13,17,23,.7);z-index:9990;align-items:center;justify-content:center;font-size:1.1rem;color:var(--gold);gap:12px}
+.loading.show{display:flex}
+.spin{width:22px;height:22px;border:3px solid var(--gold-dim);border-top-color:var(--gold);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 
-/* ─── Responsive ──────────────────────────────────── */
+/* Realtime badge */
+.rt-dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;margin-left:4px;animation:pulse 2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(46,168,78,.6)}70%{box-shadow:0 0 0 6px rgba(46,168,78,0)}100%{box-shadow:0 0 0 0 rgba(46,168,78,0)}}
+
+/* Offline / Update */
+#offlineBadge{display:none;position:fixed;top:12px;right:12px;background:#1f0b0b;color:#fca5a5;border:1px solid #7f1d1d;padding:6px 12px;border-radius:var(--r-pill);font-size:.78rem;font-weight:700;z-index:9998}
+#offlineBadge.show{display:block}
+#updateBanner{display:none;position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:9999;background:var(--felt);border:1px solid var(--gold-dim);color:var(--gold);padding:10px 18px;border-radius:var(--r-pill);font-size:.85rem;font-weight:600;gap:12px;align-items:center;box-shadow:var(--shadow);white-space:nowrap}
+#updateBanner.show{display:flex}
+#updateBanner button{background:var(--gold);color:#000;border:none;padding:5px 12px;border-radius:var(--r-pill);cursor:pointer;font-weight:700;font-family:'DM Sans',sans-serif}
+
+/* Responsive */
 @media(max-width:680px){
   body{padding:8px}
   .app-header{padding:10px 12px;gap:8px}
@@ -375,8 +191,7 @@ input[type=date].date-pick:focus{outline:none;border-color:var(--gold)}
   .day-scroll{grid-template-columns:44px 1fr}
   .hour-label{font-size:.68rem;padding:5px 5px 0 0}
   .res-block{left:4px;right:4px;padding:5px 7px}
-  .r-name{font-size:.82rem}
-  .r-meta{font-size:.7rem}
+  .r-name{font-size:.82rem}.r-meta{font-size:.7rem}
   .logo span{display:none}
   .btn{padding:7px 10px;font-size:.78rem}
 }
@@ -386,7 +201,6 @@ input[type=date].date-pick:focus{outline:none;border-color:var(--gold)}
   .res-item{flex-direction:column;align-items:flex-start}
   .ri-actions{width:100%;justify-content:flex-start}
 }
-
 ::-webkit-scrollbar{width:6px;height:6px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
@@ -395,424 +209,441 @@ input[type=date].date-pick:focus{outline:none;border-color:var(--gold)}
 </head>
 <body>
 
-<!-- Offline indicator -->
 <div id="offlineBadge">⚡ Sin conexión</div>
-
-<!-- Update banner -->
-<div id="updateBanner">
-  🎱 Nueva versión disponible
-  <button id="btnUpdate">Actualizar</button>
-</div>
-
+<div id="updateBanner">✨ Nueva versión disponible <button id="btnUpdate">Actualizar</button></div>
+<div class="loading" id="loader"><div class="spin"></div> Cargando…</div>
 <div id="root"></div>
 
 <script>
-/* ════════════════════════════════════════════
-   SERVICE WORKER REGISTRATION
-   ════════════════════════════════════════════ */
-let newWorker = null;
+/* ══════════════════════════════════════════════
+   ▶▶  CONFIGURACIÓN — pega tus credenciales  ◀◀
+   ══════════════════════════════════════════════ */
+const SUPABASE_URL  = 'https://pvoafqlwevbmfmdbdjsx.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB2b2FmcWx3ZXZibWZtZGJkanN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNDIyOTgsImV4cCI6MjA4ODYxODI5OH0.xdv1XQiafCrVWs1ccz1K_P472pNtB-rvlQ5fdQUd51U';
+/* ══════════════════════════════════════════════ */
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then(reg => {
+const SERVER_PIN = '0213';
+const OPEN       = 13 * 60;
+const CLOSE      = 24 * 60;
+const PX_MIN     = 1;
 
-      // Detectar nueva versión disponible
-      reg.addEventListener('updatefound', () => {
-        newWorker = reg.installing;
-        newWorker.addEventListener('statechange', () => {
-          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            // Hay update listo: mostrar banner
-            document.getElementById('updateBanner').classList.add('show');
-          }
-        });
-      });
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON);
 
-      // Botón "Actualizar" → decirle al SW que tome control
-      document.getElementById('btnUpdate').addEventListener('click', () => {
-        if (newWorker) newWorker.postMessage('SKIP_WAITING');
-      });
+/* Utils */
+const $      = id => document.getElementById(id);
+const pad    = n  => String(n).padStart(2,'0');
+const today  = () => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+const fmt    = m  => `${pad(Math.floor(m/60))}:${pad(m%60)}`;
+const t2m    = t  => { const[h,m]=t.split(':').map(Number); return h*60+m; };
+const nowMin = () => { const d=new Date(); return d.getHours()*60+d.getMinutes(); };
+const uid    = () => Date.now()+'-'+Math.random().toString(36).slice(2,8);
+const loader = v  => $('loader').classList.toggle('show', v);
 
-      // Cuando el SW nuevo toma control → recargar
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        window.location.reload();
-      });
-
-      // Verificar si hay update pendiente en segundo plano
-      reg.update().catch(() => {});
-
-    }).catch(err => {
-      console.warn('SW registration failed:', err);
-    });
+function overlap(start, dur, list, skipId=null){
+  const end = start+dur;
+  return list.some(r=>{
+    if(r.id===skipId || r.estado==='rechazado') return false;
+    return start < r.inicio+r.duracion && end > r.inicio;
   });
 }
 
-/* Indicador offline/online */
-function syncOffline(){
-  const badge = document.getElementById('offlineBadge');
-  if(!navigator.onLine) badge.classList.add('show');
-  else badge.classList.remove('show');
+/* ── Supabase data layer ── */
+async function fetchReservas(fecha){
+  const {data,error} = await db.from('reservas').select('*').eq('fecha',fecha).order('inicio');
+  if(error){ console.error(error); return []; }
+  return data||[];
 }
-window.addEventListener('online',  syncOffline);
-window.addEventListener('offline', syncOffline);
-syncOffline();
+async function insertReserva(r){
+  const {error}=await db.from('reservas').insert(r);
+  if(error) throw error;
+}
+// Todas las mutaciones privilegiadas van por RPC → el PIN se verifica en la BD
+async function rpc(fn, params){
+  const {error} = await db.rpc(fn, params);
+  if(error) throw error;
+}
 
+/* ── State ── */
+let modo    = 'login';
+let cliente = {nombre:'',ci:''};
+let fecha   = today();
+let msg     = {text:'',type:''};
+let rtChan  = null;
+let srvPin  = '';   // se guarda en memoria al hacer login como servidor
 
-/* ════════════════════════════════════════════
+/* ── Realtime ── */
+function suscribir(){
+  if(rtChan) db.removeChannel(rtChan);
+  rtChan = db.channel('reservas-changes')
+    .on('postgres_changes',{event:'*',schema:'public',table:'reservas'}, payload => {
+      renderApp();
+      if(payload.eventType==='INSERT') pushNotif(payload.new);
+    })
+    .subscribe();
+}
+function desuscribir(){ if(rtChan){db.removeChannel(rtChan);rtChan=null;} }
+
+async function pedirPermiso(){
+  if('Notification' in window && Notification.permission==='default')
+    await Notification.requestPermission();
+}
+function pushNotif(r){
+  if(!('Notification' in window)||Notification.permission!=='granted') return;
+  new Notification('🎱 Nueva solicitud — Geisha Bar',{
+    body:`${r.cliente} (CI ${r.ci})  ·  ${fmt(r.inicio)}–${fmt(r.inicio+r.duracion)}`,
+    icon:'/icon-192.png', tag:'res-'+r.id, renotify:true
+  });
+}
+
+/* ══════════════════════════════════════════════
+   LOGIN
+══════════════════════════════════════════════ */
+function renderLogin(){
+  desuscribir();
+  $('root').innerHTML = `
+    <div class="login-wrap">
+      <div class="login-card">
+        <div class="login-logo"><img src="/icon-192.png" style="width:72px;height:72px;object-fit:contain;border-radius:16px" alt="Geisha Bar"></div>
+        <div class="login-sub">Reserva tu mesa en segundos</div>
+        <div class="login-field"><label>Nombre</label><input id="ln" placeholder="Tu nombre" autocomplete="given-name"></div>
+        <div class="login-field"><label>CI</label><input id="lci" placeholder="Cédula de identidad" autocomplete="off"></div>
+        <div class="login-btns">
+          <button class="btn-login-main" id="btnIng">Ingresar</button>
+          <button class="btn-login-srv" id="btnSrv">Servidor</button>
+        </div>
+        <div class="login-msg" id="lmsg"></div>
+      </div>
+    </div>`;
+  $('btnIng').onclick = ()=>{
+    const n=$('ln').value.trim(), c=$('lci').value.trim();
+    if(!n||!c){$('lmsg').textContent='Complete nombre y CI.';return;}
+    cliente={nombre:n,ci:c}; modo='cliente'; renderApp();
+  };
+  $('btnSrv').onclick = ()=>{
+    const pin=prompt('PIN servidor:');
+    if(pin===SERVER_PIN){
+      modo='servidor'; cliente={nombre:'',ci:''}; srvPin=pin;
+      pedirPermiso(); suscribir(); renderApp();
+    } else if(pin!==null) alert('PIN incorrecto.');
+  };
+}
+
+/* ══════════════════════════════════════════════
    APP
-   ════════════════════════════════════════════ */
-(function(){
-  const KEY        = 'billarClub_v5';
-  const SERVER_PIN = '0213';
-  const OPEN       = 13 * 60;
-  const CLOSE      = 24 * 60;
-  const PX_MIN     = 1;
+══════════════════════════════════════════════ */
+async function renderApp(){
+  const esSrv = modo==='servidor';
+  const notifOk = 'Notification' in window && Notification.permission==='granted';
 
-  const $     = id => document.getElementById(id);
-  const load  = () => { try{ return JSON.parse(localStorage.getItem(KEY))||[]; }catch{ return []; } }
-  const save  = d  => localStorage.setItem(KEY, JSON.stringify(d));
-  const uid   = () => Date.now()+'-'+Math.random().toString(36).slice(2,8);
-  const pad   = n  => String(n).padStart(2,'0');
-  const today = () => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
-  const fmt   = m  => `${pad(Math.floor(m/60))}:${pad(m%60)}`;
-  const t2m   = t  => { const[h,m]=t.split(':').map(Number); return h*60+m; }
-  const nowMin= () => { const d=new Date(); return d.getHours()*60+d.getMinutes(); }
-
-  function overlap(start, dur, list, skipId=null){
-    const end = start + dur;
-    return list.some(r=>{
-      if(r.id===skipId || r.estado==='rechazado') return false;
-      return start < r.inicio+r.duracion && end > r.inicio;
-    });
-  }
-
-  let modo    = 'login';
-  let cliente = { nombre:'', ci:'' };
-  let fecha   = today();
-  let msg     = { text:'', type:'' };
-
-  /* ── Notificaciones (BroadcastChannel) ── */
-  // Canal compartido entre pestañas del mismo origen
-  const canal = ('BroadcastChannel' in window) ? new BroadcastChannel('billar-reservas') : null;
-  let pollTimer = null;
-
-  // Servidor: escucha mensajes de clientes
-  function iniciarEscuchaServidor(){
-    if(canal){
-      canal.onmessage = e => {
-        if(e.data?.tipo === 'nueva-reserva') notificarServidor(e.data.reserva);
-      };
-    }
-    // Polling cada 20s para capturar reservas hechas desde otros dispositivos
-    clearInterval(pollTimer);
-    pollTimer = setInterval(()=>{ if(modo==='servidor') renderApp(); }, 20000);
-  }
-
-  function detenerEscucha(){
-    if(canal) canal.onmessage = null;
-    clearInterval(pollTimer);
-  }
-
-  async function pedirPermisoNotificacion(){
-    if(!('Notification' in window)) return;
-    if(Notification.permission === 'default') await Notification.requestPermission();
-  }
-
-  function notificarServidor(r){
-    if(!r) return;
-    renderApp(); // refrescar vista
-    if(!('Notification' in window) || Notification.permission !== 'granted') return;
-    new Notification('🎱 Nueva solicitud de reserva', {
-      body: `${r.cliente} · ${fmt(r.inicio)}–${fmt(r.inicio+r.duracion)}`,
-      icon: '/icon-192.png',
-      tag:  'reserva-'+r.id,
-      renotify: true
-    });
-  }
-
-  // Cliente: emite al crear reserva
-  function emitirNuevaReserva(r){
-    if(canal) canal.postMessage({ tipo:'nueva-reserva', reserva:r });
-  }
-
-  /* ── Login ── */
-  function renderLogin(){
-    $('root').innerHTML = `
-      <div class="login-wrap">
-        <div class="login-card">
-          <div class="login-logo">🎱 Billar Club</div>
-          <div class="login-sub">Reserva tu mesa en segundos</div>
-          <div class="login-field"><label>Nombre</label><input id="ln" placeholder="Tu nombre" autocomplete="off"></div>
-          <div class="login-field"><label>CI</label><input id="lci" placeholder="Cédula de identidad" autocomplete="off"></div>
-          <div class="login-btns">
-            <button class="btn-login-main" id="btnIng">Ingresar</button>
-            <button class="btn-login-srv" id="btnSrv">Servidor</button>
-          </div>
-          <div class="login-msg" id="lmsg"></div>
+  $('root').innerHTML = `
+    <div class="app">
+      <header class="app-header">
+        <div class="logo"><img src="/icon-192.png" style="width:28px;height:28px;object-fit:contain;border-radius:6px;vertical-align:middle;margin-right:8px" alt="">Geisha Bar<span>/ Reservas</span></div>
+        <div class="header-right">
+          <input type="date" class="date-pick" id="fechaPick" value="${fecha}">
+          <span class="badge-role">${esSrv?'🔧 Servidor':'👤 '+cliente.nombre}</span>
+          ${esSrv?`
+            <span class="badge-role" style="font-size:.72rem;display:inline-flex;align-items:center;gap:4px">
+              En vivo<span class="rt-dot"></span>
+            </span>
+            <button class="btn btn-gold" id="btnCheck">Verificar llegada</button>
+            ${!notifOk?`<button class="btn btn-gold" id="btnNotif">🔔 Activar avisos</button>`:''}
+          `:''}
+          <button class="btn btn-ghost" id="btnSalir">${esSrv?'Salir':'Cerrar sesión'}</button>
         </div>
-      </div>`;
-    $('btnIng').onclick = () => {
-      const n=$('ln').value.trim(), c=$('lci').value.trim();
-      if(!n||!c){ $('lmsg').textContent='Complete nombre y CI.'; return; }
-      cliente={nombre:n,ci:c}; modo='cliente'; renderApp();
-    };
-    $('btnSrv').onclick = () => {
-      const pin=prompt('PIN servidor:');
-      if(pin===SERVER_PIN){
-        modo='servidor'; cliente={nombre:'',ci:''};
-        pedirPermisoNotificacion();
-        iniciarEscuchaServidor();
-        renderApp();
-      }
-      else if(pin!==null) alert('PIN incorrecto.');
-    };
-  }
+      </header>
 
-  /* ── App ── */
-  function renderApp(){
-    const esSrv = modo==='servidor';
-    $('root').innerHTML = `
-      <div class="app">
-        <header class="app-header">
-          <div class="logo">🎱 Billar Club<span>/ Reservas</span></div>
-          <div class="header-right">
-            <input type="date" class="date-pick" id="fechaPick" value="${fecha}">
-            <span class="badge-role">${esSrv ? '🔧 Servidor' : '👤 '+cliente.nombre}</span>
-            ${esSrv ? `<button class="btn btn-gold" id="btnCheck">Verificar llegada</button>` : ''}
-            <button class="btn btn-ghost" id="btnSalir">${esSrv ? 'Salir' : 'Cerrar sesión'}</button>
-          </div>
-        </header>
-
-        ${!esSrv ? `
-          <div class="form-card">
-            <div class="field"><label>Hora inicio</label><input type="time" id="fHora" value="16:00" step="300"></div>
-            <div class="field"><label>Duración (min)</label><input type="number" id="fDur" value="60" min="15" step="15"></div>
-            <button class="btn-submit" id="btnSolicitar">Solicitar</button>
-            <div class="form-msg" id="fMsg" style="color:#f87171"></div>
-          </div>
-        ` : `
-          <div class="srv-bar">
-            <button class="btn btn-primary" id="btnRefresh">↻ Actualizar</button>
-            ${('Notification' in window && Notification.permission !== 'granted') ? `<button class="btn btn-gold" id="btnNotif">🔔 Activar notificaciones</button>` : (Notification.permission === 'granted' ? `<span class="badge-role" style="font-size:.75rem">🔔 Notificaciones activas</span>` : '')}
-            <button class="btn btn-ghost" id="btnToCliente">Vista cliente</button>
-          </div>
-        `}
-
-        <div class="msg-bar ${msg.text ? 'show '+(msg.type||'') : ''}" id="msgBar">${msg.text||''}</div>
-
-        <div class="day-view">
-          <div class="day-scroll">
-            <div class="hours-col" id="hCol"></div>
-            <div class="timeline" id="tLine"></div>
-          </div>
+      ${!esSrv?`
+        <div class="form-card">
+          <div class="field"><label>Hora inicio</label><input type="time" id="fHora" value="16:00" step="300"></div>
+          <div class="field"><label>Duración (min)</label><input type="number" id="fDur" value="60" min="15" step="15"></div>
+          <button class="btn-submit" id="btnSolicitar">Solicitar</button>
+          <div class="form-msg" id="fMsg" style="color:#f87171"></div>
         </div>
+      `:`
+        <div class="srv-bar">
+          <button class="btn btn-primary" id="btnRefresh">↻ Actualizar</button>
+          <button class="btn btn-ghost" id="btnToCliente">Vista cliente</button>
+        </div>
+      `}
 
-        ${esSrv ? `
-          <div class="lists-grid">
-            <div class="list-card">
-              <h3><span class="dot dot-pend"></span> Pendientes</h3>
-              <div id="lPend"></div>
-            </div>
-            <div class="list-card">
-              <h3><span class="dot dot-res"></span> Reservados</h3>
-              <div id="lRes"></div>
-            </div>
+      <div class="msg-bar ${msg.text?'show '+(msg.type||''):''}" id="msgBar">${msg.text||''}</div>
+
+      <div class="day-view">
+        <div class="day-scroll">
+          <div class="hours-col" id="hCol"></div>
+          <div class="timeline" id="tLine"></div>
+        </div>
+      </div>
+
+      ${esSrv?`
+        <div class="lists-grid">
+          <div class="list-card">
+            <h3><span class="dot dot-pend"></span> Pendientes</h3>
+            <div id="lPend"><div class="empty">Cargando…</div></div>
           </div>
           <div class="list-card">
-            <h3><span class="dot dot-rech"></span> Rechazadas</h3>
-            <div id="lRech"></div>
+            <h3><span class="dot dot-res"></span> Reservados</h3>
+            <div id="lRes"><div class="empty">Cargando…</div></div>
           </div>
-        ` : ''}
-      </div>`;
+        </div>
+        <div class="list-card">
+          <h3><span class="dot dot-rech"></span> Rechazadas</h3>
+          <div id="lRech"><div class="empty">Cargando…</div></div>
+        </div>
+      `:''}
+    </div>`;
 
-    $('fechaPick').onchange = e => { fecha=e.target.value; msg={text:'',type:''}; renderApp(); };
-    $('btnSalir').onclick = () => {
-      msg={text:'',type:''};
-      if(modo==='servidor'){ detenerEscucha(); modo='cliente'; cliente={nombre:'',ci:''}; renderApp(); }
-      else { modo='login'; renderLogin(); }
-    };
-    if(!esSrv){
-      $('btnSolicitar').onclick = solicitar;
-    } else {
-      $('btnRefresh').onclick   = () => renderApp();
-      if($('btnNotif')) $('btnNotif').onclick = async () => { await pedirPermisoNotificacion(); renderApp(); };
-      $('btnToCliente').onclick = () => { detenerEscucha(); modo='cliente'; renderApp(); };
-      $('btnCheck').onclick     = verificarLlegada;
-    }
-    renderDay();
-    if(esSrv) renderListas();
+  $('fechaPick').onchange = e=>{ fecha=e.target.value; msg={text:'',type:''}; renderApp(); };
+  $('btnSalir').onclick = ()=>{
+    msg={text:'',type:''};
+    if(modo==='servidor'){desuscribir();modo='cliente';cliente={nombre:'',ci:''};renderApp();}
+    else{modo='login';renderLogin();}
+  };
+  if(!esSrv){
+    $('btnSolicitar').onclick = solicitar;
+  } else {
+    $('btnRefresh').onclick   = ()=>renderApp();
+    $('btnToCliente').onclick = ()=>{desuscribir();modo='cliente';renderApp();};
+    $('btnCheck').onclick     = verificarLlegada;
+    if($('btnNotif')) $('btnNotif').onclick = async()=>{await pedirPermiso();renderApp();};
   }
 
-  /* ── Day ── */
-  function renderDay(){
-    const tLine=$('tLine'), hCol=$('hCol');
-    tLine.style.height=((CLOSE-OPEN)*PX_MIN)+'px';
-    tLine.innerHTML=''; hCol.innerHTML='';
-    for(let h=Math.floor(OPEN/60); h<Math.floor(CLOSE/60); h++){
-      const lbl=document.createElement('div');
-      lbl.className='hour-label'; lbl.style.height=(60*PX_MIN)+'px';
-      lbl.textContent=pad(h)+':00'; hCol.appendChild(lbl);
-      const line=document.createElement('div');
-      line.className='line-hour'+(h%2===0?' prominent':'');
-      line.style.top=((h*60-OPEN)*PX_MIN)+'px'; tLine.appendChild(line);
-    }
-    const esSrv=modo==='servidor';
-    load().filter(r=>r.fecha===fecha).sort((a,b)=>a.inicio-b.inicio).forEach(r=>{
-      const top=(r.inicio-OPEN)*PX_MIN;
-      const height=Math.max(r.duracion*PX_MIN,30);
-      const esProp=cliente.ci&&cliente.ci===r.ci&&cliente.nombre===r.cliente;
-      const canEdit=(r.estado==='pendiente'&&(esProp||esSrv))||(r.estado==='reservado'&&esSrv);
-      const canApprove=esSrv&&r.estado==='pendiente';
-      const cls=r.estado==='pendiente'?'res-pend':r.estado==='reservado'?'res-res':'res-rech';
-      const badgeCls=r.estado==='pendiente'?'badge-p':r.estado==='reservado'?'badge-r':'badge-x';
-      const badgeTxt=r.estado==='pendiente'?'Pendiente':r.estado==='reservado'?'Reservado':'Rechazado';
-      const div=document.createElement('div');
-      div.className=`res-block ${cls}`;
-      div.style.cssText=`top:${top}px;height:${height}px`;
-      div.innerHTML=`
-        <div class="r-name">${r.cliente}</div>
-        <div class="r-meta">${fmt(r.inicio)} – ${fmt(r.inicio+r.duracion)} · CI ${r.ci||'—'}</div>
-        <span class="r-badge ${badgeCls}">${badgeTxt}</span>
-        <div class="r-actions" id="ra-${r.id}"></div>`;
-      const actions=div.querySelector(`#ra-${r.id}`);
-      if(canApprove){
-        actions.append(mkBtn('ra-btn ra-approve','✓ Aprobar',()=>aprobar(r.id)));
-        actions.append(mkBtn('ra-btn ra-reject','✗ Rechazar',()=>rechazar(r.id)));
-      }
-      if(canEdit) actions.append(mkBtn('ra-btn ra-edit','Editar',()=>editar(r.id)));
-      if(esSrv)   actions.append(mkBtn('ra-btn ra-delete','🗑 Eliminar',()=>eliminar(r.id)));
-      tLine.appendChild(div);
-    });
+  loader(true);
+  try {
+    const reservas = await fetchReservas(fecha);
+    renderDay(reservas);
+    if(esSrv) renderListas(reservas);
+  } catch(e){
+    showMsg('Error al conectar con la base de datos.','err');
+  } finally {
+    loader(false);
   }
+}
 
-  /* ── Listas ── */
-  function renderListas(){
-    const all=load().filter(r=>r.fecha===fecha).sort((a,b)=>a.inicio-b.inicio);
-    fill('lPend', all.filter(r=>r.estado==='pendiente'), r=>{
-      const d=mkItem(r);
-      d.querySelector('.ri-actions').append(
-        mkBtn('btn btn-success ra-btn','✓ Aprobar',()=>aprobar(r.id)),
-        mkBtn('btn btn-warn ra-btn','✗ Rechazar',()=>rechazar(r.id)),
-        mkBtn('btn btn-primary ra-btn','Editar',()=>editar(r.id)),
-        mkBtn('btn btn-danger ra-btn','Eliminar',()=>eliminar(r.id))
-      ); return d;
-    });
-    fill('lRes', all.filter(r=>r.estado==='reservado'), r=>{
-      const d=mkItem(r);
-      d.querySelector('.ri-actions').append(
-        mkBtn('btn btn-primary ra-btn','Editar',()=>editar(r.id)),
-        mkBtn('btn btn-danger ra-btn','Eliminar',()=>eliminar(r.id))
-      ); return d;
-    });
-    fill('lRech', all.filter(r=>r.estado==='rechazado'), r=>{
-      const d=mkItem(r);
-      d.querySelector('.ri-actions').append(mkBtn('btn btn-danger ra-btn','Eliminar',()=>eliminar(r.id)));
-      return d;
-    });
+/* ── Day ── */
+function renderDay(reservas){
+  const tLine=$('tLine'), hCol=$('hCol');
+  if(!tLine||!hCol) return;
+  tLine.style.height=((CLOSE-OPEN)*PX_MIN)+'px';
+  tLine.innerHTML=''; hCol.innerHTML='';
+  for(let h=Math.floor(OPEN/60);h<Math.floor(CLOSE/60);h++){
+    const lbl=document.createElement('div');
+    lbl.className='hour-label'; lbl.style.height=(60*PX_MIN)+'px';
+    lbl.textContent=pad(h)+':00'; hCol.appendChild(lbl);
+    const line=document.createElement('div');
+    line.className='line-hour'+(h%2===0?' prominent':'');
+    line.style.top=((h*60-OPEN)*PX_MIN)+'px'; tLine.appendChild(line);
   }
-
-  function fill(id, items, builder){
-    const el=$(id); if(!el) return;
-    el.innerHTML='';
-    if(!items.length){ el.innerHTML='<div class="empty">Sin registros</div>'; return; }
-    items.forEach(r=>el.appendChild(builder(r)));
-  }
-
-  function mkItem(r){
-    const badgeCls=r.estado==='pendiente'?'badge-p':r.estado==='reservado'?'badge-r':'badge-x';
-    const badgeTxt=r.estado==='pendiente'?'Pendiente':r.estado==='reservado'?'Reservado':'Rechazado';
-    const div=document.createElement('div'); div.className='res-item';
+  const esSrv=modo==='servidor';
+  reservas.forEach(r=>{
+    const top=(r.inicio-OPEN)*PX_MIN, height=Math.max(r.duracion*PX_MIN,30);
+    const esProp=cliente.ci&&cliente.ci===r.ci&&cliente.nombre===r.cliente;
+    const canEdit=(r.estado==='pendiente'&&(esProp||esSrv))||(r.estado==='reservado'&&esSrv);
+    const canApprove=esSrv&&r.estado==='pendiente';
+    const cls=r.estado==='pendiente'?'res-pend':r.estado==='reservado'?'res-res':'res-rech';
+    const bc=r.estado==='pendiente'?'badge-p':r.estado==='reservado'?'badge-r':'badge-x';
+    const bt=r.estado==='pendiente'?'Pendiente':r.estado==='reservado'?'Reservado':'Rechazado';
+    const div=document.createElement('div');
+    div.className=`res-block ${cls}`;
+    div.style.cssText=`top:${top}px;height:${height}px`;
     div.innerHTML=`
-      <div class="ri-info">
-        <div class="ri-name">${r.cliente}</div>
-        <div class="ri-sub">CI: ${r.ci} · ${fmt(r.inicio)} – ${fmt(r.inicio+r.duracion)}</div>
-        <span class="r-badge ${badgeCls}" style="margin-top:4px">${badgeTxt}</span>
-      </div>
-      <div class="ri-actions"></div>`;
-    return div;
-  }
+      <div class="r-name">${r.cliente}</div>
+      <div class="r-meta">${fmt(r.inicio)} – ${fmt(r.inicio+r.duracion)} · CI ${r.ci||'—'}</div>
+      <span class="r-badge ${bc}">${bt}</span>
+      <div class="r-actions" id="ra-${r.id}"></div>`;
+    const ac=div.querySelector(`#ra-${r.id}`);
+    if(canApprove){
+      ac.append(mkBtn('ra-btn ra-approve','✓ Aprobar',()=>aprobar(r.id)));
+      ac.append(mkBtn('ra-btn ra-reject','✗ Rechazar',()=>rechazar(r.id)));
+    }
+    if(canEdit) ac.append(mkBtn('ra-btn ra-edit','Editar',()=>editar(r)));
+    if(esSrv)   ac.append(mkBtn('ra-btn ra-delete','🗑',()=>eliminar(r)));
+    tLine.appendChild(div);
+  });
+}
 
-  function mkBtn(cls, txt, cb){
-    const b=document.createElement('button');
-    b.className=cls; b.textContent=txt;
-    b.onclick=e=>{ e.stopPropagation(); cb(); };
-    return b;
-  }
+/* ── Listas ── */
+function renderListas(reservas){
+  const pend=reservas.filter(r=>r.estado==='pendiente');
+  const res =reservas.filter(r=>r.estado==='reservado');
+  const rech=reservas.filter(r=>r.estado==='rechazado');
+  fill('lPend',pend,r=>{
+    const d=mkItem(r);
+    d.querySelector('.ri-actions').append(
+      mkBtn('btn btn-success ra-btn','✓ Aprobar',()=>aprobar(r.id)),
+      mkBtn('btn btn-warn ra-btn','✗ Rechazar',()=>rechazar(r.id)),
+      mkBtn('btn btn-primary ra-btn','Editar',()=>editar(r)),
+      mkBtn('btn btn-danger ra-btn','Eliminar',()=>eliminar(r))
+    ); return d;
+  });
+  fill('lRes',res,r=>{
+    const d=mkItem(r);
+    d.querySelector('.ri-actions').append(
+      mkBtn('btn btn-primary ra-btn','Editar',()=>editar(r)),
+      mkBtn('btn btn-danger ra-btn','Eliminar',()=>eliminar(r))
+    ); return d;
+  });
+  fill('lRech',rech,r=>{
+    const d=mkItem(r);
+    d.querySelector('.ri-actions').append(mkBtn('btn btn-danger ra-btn','Eliminar',()=>eliminar(r)));
+    return d;
+  });
+}
 
-  /* ── Actions ── */
-  function solicitar(){
-    const hora=$('fHora').value, dur=parseInt($('fDur').value,10);
-    const msgEl=$('fMsg'); msgEl.textContent=''; msgEl.style.color='#f87171';
-    if(!hora){ msgEl.textContent='Seleccione hora.'; return; }
-    if(isNaN(dur)||dur<15){ msgEl.textContent='Duración mínima 15 min.'; return; }
-    const inicio=t2m(hora);
-    if(inicio<OPEN||inicio+dur>CLOSE){ msgEl.textContent='Fuera de horario (13:00–24:00).'; return; }
-    if(fecha===today()&&inicio<nowMin()){ msgEl.textContent='No puede reservar en el pasado.'; return; }
-    const data=load();
-    if(overlap(inicio,dur,data.filter(r=>r.fecha===fecha))){ msgEl.textContent='Horario no disponible.'; return; }
-    data.push({id:uid(),fecha,inicio,duracion:dur,cliente:cliente.nombre,ci:cliente.ci,estado:'pendiente',creado:Date.now()});
-    save(data);
-    emitirNuevaReserva(data[data.length-1]);
+function fill(id,items,builder){
+  const el=$(id); if(!el) return;
+  el.innerHTML='';
+  if(!items.length){el.innerHTML='<div class="empty">Sin registros</div>';return;}
+  items.forEach(r=>el.appendChild(builder(r)));
+}
+function mkItem(r){
+  const bc=r.estado==='pendiente'?'badge-p':r.estado==='reservado'?'badge-r':'badge-x';
+  const bt=r.estado==='pendiente'?'Pendiente':r.estado==='reservado'?'Reservado':'Rechazado';
+  const div=document.createElement('div'); div.className='res-item';
+  div.innerHTML=`
+    <div>
+      <div class="ri-name">${r.cliente}</div>
+      <div class="ri-sub">CI: ${r.ci} · ${fmt(r.inicio)} – ${fmt(r.inicio+r.duracion)}</div>
+      <span class="r-badge ${bc}" style="margin-top:4px">${bt}</span>
+    </div>
+    <div class="ri-actions"></div>`;
+  return div;
+}
+function mkBtn(cls,txt,cb){
+  const b=document.createElement('button');
+  b.className=cls; b.textContent=txt;
+  b.onclick=e=>{e.stopPropagation();cb();};
+  return b;
+}
+
+/* ══════════════════════════════════════════════
+   ACCIONES
+══════════════════════════════════════════════ */
+async function solicitar(){
+  const hora=$('fHora').value, dur=parseInt($('fDur').value,10);
+  const msgEl=$('fMsg'); msgEl.textContent=''; msgEl.style.color='#f87171';
+  if(!hora){msgEl.textContent='Seleccione hora.';return;}
+  if(isNaN(dur)||dur<15){msgEl.textContent='Duración mínima 15 min.';return;}
+  const inicio=t2m(hora);
+  if(inicio<OPEN||inicio+dur>CLOSE){msgEl.textContent='Fuera de horario (13:00–24:00).';return;}
+  if(fecha===today()&&inicio<nowMin()){msgEl.textContent='No puede reservar en el pasado.';return;}
+  const btn=$('btnSolicitar'); btn.disabled=true; loader(true);
+  try {
+    const existentes=await fetchReservas(fecha);
+    if(overlap(inicio,dur,existentes)){msgEl.textContent='Horario no disponible.';return;}
+    await insertReserva({id:uid(),fecha,inicio,duracion:dur,cliente:cliente.nombre,ci:cliente.ci,estado:'pendiente',creado:Date.now()});
     msgEl.style.color='#86efac';
     msgEl.textContent='✓ Solicitud enviada — pendiente de aprobación.';
-    setTimeout(()=>renderApp(), 700);
+    setTimeout(()=>renderApp(),800);
+  } catch(e){
+    msgEl.textContent='Error al enviar. Verifica tu conexión.';
+  } finally {
+    loader(false); if($('btnSolicitar')) $('btnSolicitar').disabled=false;
   }
+}
 
-  function aprobar(id){
-    const data=load(), idx=data.findIndex(r=>r.id===id); if(idx<0) return;
-    const r=data[idx];
-    if(overlap(r.inicio,r.duracion,data.filter(x=>x.fecha===r.fecha&&x.id!==id),id)){
-      if(!confirm('Solapamiento detectado. ¿Aprobar igualmente?')) return;
-    }
-    data[idx].estado='reservado'; save(data);
-    showMsg('Reserva aprobada.','ok'); renderApp();
-  }
+async function aprobar(id){
+  loader(true);
+  try {
+    const reservas=await fetchReservas(fecha);
+    const r=reservas.find(x=>x.id===id); if(!r) return;
+    if(overlap(r.inicio,r.duracion,reservas,id))
+      if(!confirm('Solapamiento. ¿Aprobar igualmente?')){loader(false);return;}
+    await rpc('srv_aprobar',{p_pin:srvPin, p_id:id});
+    showMsg('Reserva aprobada.','ok');
+  } catch(e){showMsg(e.message||'Error al aprobar.','err');}
+  finally{loader(false);renderApp();}
+}
 
-  function rechazar(id){
-    if(!confirm('¿Rechazar esta reserva?')) return;
-    const data=load(), idx=data.findIndex(r=>r.id===id); if(idx<0) return;
-    data[idx].estado='rechazado'; save(data);
-    showMsg('Reserva rechazada.','err'); renderApp();
-  }
+async function rechazar(id){
+  if(!confirm('¿Rechazar esta reserva?')) return;
+  loader(true);
+  try {
+    await rpc('srv_rechazar',{p_pin:srvPin, p_id:id});
+    showMsg('Reserva rechazada.','err');
+  } catch(e){showMsg(e.message||'Error al rechazar.','err');}
+  finally{loader(false);renderApp();}
+}
 
-  function editar(id){
-    const data=load(), idx=data.findIndex(r=>r.id===id); if(idx<0) return;
-    const r=data[idx];
-    const esProp=cliente.ci&&cliente.ci===r.ci&&cliente.nombre===r.cliente;
-    const puede=(r.estado==='pendiente'&&(esProp||modo==='servidor'))||(r.estado==='reservado'&&modo==='servidor');
-    if(!puede){ alert('Sin permiso para editar.'); return; }
-    const nh=prompt('Nueva hora inicio (HH:MM):',fmt(r.inicio)); if(!nh) return;
-    const nd=prompt('Nueva duración (min):',String(r.duracion)); if(!nd) return;
-    const inicio=t2m(nh), dur=parseInt(nd,10);
-    if(isNaN(dur)||dur<15){ alert('Duración inválida.'); return; }
-    if(inicio<OPEN||inicio+dur>CLOSE){ alert('Fuera de horario (13:00–24:00).'); return; }
-    if(overlap(inicio,dur,data.filter(x=>x.fecha===r.fecha&&x.id!==id),id)){
-      if(!confirm('Solapamiento. ¿Aplicar igualmente?')) return;
-    }
-    data[idx].inicio=inicio; data[idx].duracion=dur; data[idx].modificado=Date.now();
-    save(data); showMsg('Reserva actualizada.','ok'); renderApp();
-  }
+async function editar(r){
+  const esProp=cliente.ci&&cliente.ci===r.ci&&cliente.nombre===r.cliente;
+  const puede=(r.estado==='pendiente'&&(esProp||modo==='servidor'))||(r.estado==='reservado'&&modo==='servidor');
+  if(!puede){alert('Sin permiso para editar.');return;}
+  const nh=prompt('Nueva hora inicio (HH:MM):',fmt(r.inicio)); if(!nh) return;
+  const nd=prompt('Nueva duración (min):',String(r.duracion)); if(!nd) return;
+  const inicio=t2m(nh), dur=parseInt(nd,10);
+  if(isNaN(dur)||dur<15){alert('Duración inválida.');return;}
+  if(inicio<OPEN||inicio+dur>CLOSE){alert('Fuera de horario (13:00–24:00).');return;}
+  loader(true);
+  try {
+    const reservas=await fetchReservas(fecha);
+    if(overlap(inicio,dur,reservas,r.id))
+      if(!confirm('Solapamiento. ¿Aplicar igualmente?')){loader(false);return;}
+    // Servidor: pasa srvPin; cliente: pasa SERVER_PIN como señal
+    // La BD distingue por p_ci: null=servidor, valor=cliente
+    const esCliente = modo==='cliente';
+    await rpc('srv_editar',{
+      p_pin:     esCliente ? srvPin : srvPin,   // siempre srvPin (solo servidor edita)
+      p_id:      r.id,
+      p_inicio:  inicio,
+      p_duracion:dur,
+      p_ci:      esCliente ? cliente.ci : null  // null → permisos de servidor
+    });
+    showMsg('Reserva actualizada.','ok');
+  } catch(e){showMsg(e.message||'Error al editar.','err');}
+  finally{loader(false);renderApp();}
+}
 
-  function eliminar(id){
-    const data=load(), idx=data.findIndex(r=>r.id===id); if(idx<0) return;
-    const r=data[idx];
-    if(!confirm(`¿Eliminar definitivamente la reserva de ${r.cliente} (${fmt(r.inicio)}–${fmt(r.inicio+r.duracion)})?`)) return;
-    data.splice(idx,1); save(data);
-    showMsg('Reserva eliminada.','err'); renderApp();
-  }
+async function eliminar(r){
+  if(!confirm(`¿Eliminar la reserva de ${r.cliente} (${fmt(r.inicio)}–${fmt(r.inicio+r.duracion)})?`)) return;
+  loader(true);
+  try {
+    await rpc('srv_eliminar',{p_pin:srvPin, p_id:r.id});
+    showMsg('Reserva eliminada.','err');
+  } catch(e){showMsg(e.message||'Error al eliminar.','err');}
+  finally{loader(false);renderApp();}
+}
 
-  function verificarLlegada(){
-    if(fecha!==today()){ showMsg('Seleccione la fecha de hoy para verificar llegadas.','err'); renderApp(); return; }
-    const ahora=nowMin();
-    const act=load().find(r=>r.fecha===fecha&&r.estado==='reservado'&&ahora>=r.inicio&&ahora<r.inicio+r.duracion);
-    if(act) showMsg(`✓ Mesa ocupada: ${act.cliente} (CI ${act.ci}) · ${fmt(act.inicio)}–${fmt(act.inicio+act.duracion)}`,'ok');
-    else    showMsg('Sin reserva activa en este momento.','');
-    renderApp();
-  }
+async function verificarLlegada(){
+  if(fecha!==today()){showMsg('Seleccione la fecha de hoy.','err');renderApp();return;}
+  loader(true);
+  const reservas=await fetchReservas(fecha);
+  loader(false);
+  const ahora=nowMin();
+  const act=reservas.find(r=>r.estado==='reservado'&&ahora>=r.inicio&&ahora<r.inicio+r.duracion);
+  if(act) showMsg(`✓ Mesa ocupada: ${act.cliente} (CI ${act.ci}) · ${fmt(act.inicio)}–${fmt(act.inicio+act.duracion)}`,'ok');
+  else    showMsg('Sin reserva activa en este momento.','');
+  renderApp();
+}
 
-  function showMsg(text, type){ msg={text,type}; }
+function showMsg(text,type){msg={text,type};}
 
-  renderLogin();
-})();
+/* Offline */
+const syncOffline=()=>$('offlineBadge').classList.toggle('show',!navigator.onLine);
+window.addEventListener('online',syncOffline); window.addEventListener('offline',syncOffline); syncOffline();
+
+/* Service Worker */
+let newWorker=null;
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('/sw.js').then(reg=>{
+      reg.addEventListener('updatefound',()=>{
+        newWorker=reg.installing;
+        newWorker.addEventListener('statechange',()=>{
+          if(newWorker.state==='installed'&&navigator.serviceWorker.controller)
+            $('updateBanner').classList.add('show');
+        });
+      });
+      $('btnUpdate').addEventListener('click',()=>{if(newWorker)newWorker.postMessage('SKIP_WAITING');});
+      navigator.serviceWorker.addEventListener('controllerchange',()=>window.location.reload());
+      reg.update().catch(()=>{});
+    }).catch(()=>{});
+  });
+}
+
+renderLogin();
 </script>
 </body>
 </html>

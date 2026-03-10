@@ -1,6 +1,6 @@
 {
-  "name": "Billar Club — Reservas",
-  "short_name": "Billar Club",
+  "name": "Geisha Bar — Reservas de Billar",
+  "short_name": "Geisha Pool",
   "description": "Sistema de reservas para mesa de billar",
   "start_url": "/index.html",
   "display": "standalone",
