@@ -295,8 +295,6 @@ let fecha   = today();
 let msg     = {text:'',type:''};
 let rtChan  = null;
 
-// Si había sesión de servidor activa, reconectar realtime
-if(modo === 'servidor' && srvPin) { suscribir(); }
 
 /* ── Realtime ── */
 let rtStatus = 'off'; // 'off' | 'connecting' | 'ok' | 'error'
@@ -758,8 +756,14 @@ if('serviceWorker' in navigator){
 }
 
 // Boot — restaurar sesión si existe
-if(modo === 'servidor' && srvPin){ pedirPermiso(); renderApp(); }
-else if(modo === 'cliente' && cliente.nombre){ renderApp(); }
-else { renderLogin(); }
+if(modo === 'servidor' && srvPin){
+  suscribir();   // reconectar Realtime
+  pedirPermiso();
+  renderApp();
+} else if(modo === 'cliente' && cliente.nombre){
+  renderApp();
+} else {
+  renderLogin();
+}
 </body>
 </html>

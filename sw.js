@@ -3,7 +3,7 @@
    Estrategia: Cache First para assets estáticos
    ───────────────────────────────────────────── */
 
-const CACHE_NAME  = 'geisha-bar-v2';
+const CACHE_NAME  = 'geisha-bar-v3';
 const CACHE_URLS  = [
   './index.html',
   './manifest.json',
