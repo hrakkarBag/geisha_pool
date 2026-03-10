@@ -578,6 +578,7 @@ function renderDay(reservas){
     }
     if(canEdit)  ac.append(mkBtn('ra-btn ra-edit',  'Editar', () => editar(r)));
     if(esSrv)    ac.append(mkBtn('ra-btn ra-delete', '🗑',     () => eliminar(r)));
+    if(!esSrv && esProp && r.estado === 'pendiente') ac.append(mkBtn('ra-btn ra-delete', '🗑 Cancelar', () => cancelarProp(r)));
     tLine.appendChild(div);
   });
 }
@@ -658,8 +659,10 @@ async function solicitar(){
   try {
     const existentes = await fetchReservas(fecha);
     const m = $('fMsg');
-    if(overlap(inicio, dur, existentes)){
-      if(m){ m.style.color='#f87171'; m.textContent = 'Horario no disponible.'; }
+    // Solo bloquear si ya hay una APROBADA en ese horario; pendientes pueden solaparse
+    const soloAprobadas = existentes.filter(r => r.estado === 'reservado');
+    if(overlap(inicio, dur, soloAprobadas)){
+      if(m){ m.style.color='#f87171'; m.textContent = 'Ese horario ya está reservado.'; }
       return;
     }
     await insertReserva({
@@ -709,8 +712,8 @@ async function rechazar(id){
 }
 
 async function editar(r){
-  // Solo el servidor puede editar (los clientes no tienen el PIN para la RPC)
-  if(modo !== 'servidor'){ alert('Solo el servidor puede editar reservas.'); return; }
+  const esPropCliente = modo === 'cliente' && cliente.ci === r.ci && r.estado === 'pendiente';
+  if(modo !== 'servidor' && !esPropCliente){ alert('No puedes editar esta reserva.'); return; }
   const nh = prompt('Nueva hora inicio (HH:MM):', fmt(r.inicio)); if(!nh) return;
   const nd = prompt('Nueva duración (min):', String(r.duracion)); if(!nd) return;
   const inicio = t2m(nh), dur = parseInt(nd, 10);
@@ -718,12 +721,26 @@ async function editar(r){
   if(inicio < OPEN || inicio + dur > CLOSE){ alert('Fuera de horario (13:00–24:00).'); return; }
   loader(true);
   try {
-    const reservas = await fetchReservas(fecha);
-    if(overlap(inicio, dur, reservas, r.id))
-      if(!confirm('Solapamiento. ¿Aplicar igualmente?')){ loader(false); return; }
-    await rpc('srv_editar', {p_pin: srvPin, p_id: r.id, p_inicio: inicio, p_duracion: dur, p_ci: null});
+    if(esPropCliente){
+      await rpc('cli_editar', {p_ci: cliente.ci, p_id: r.id, p_inicio: inicio, p_duracion: dur});
+    } else {
+      const reservas = await fetchReservas(fecha);
+      if(overlap(inicio, dur, reservas, r.id))
+        if(!confirm('Solapamiento. ¿Aplicar igualmente?')){ loader(false); return; }
+      await rpc('srv_editar', {p_pin: srvPin, p_id: r.id, p_inicio: inicio, p_duracion: dur, p_ci: null});
+    }
     showMsg('Reserva actualizada.', 'ok');
   } catch(e){ showMsg(e.message || 'Error al editar.', 'err'); }
+  finally { loader(false); renderApp(); }
+}
+
+async function cancelarProp(r){
+  if(!confirm('¿Cancelar tu solicitud de ' + fmt(r.inicio) + '–' + fmt(r.inicio+r.duracion) + '?')) return;
+  loader(true);
+  try {
+    await rpc('cli_eliminar', {p_ci: cliente.ci, p_id: r.id});
+    showMsg('Solicitud cancelada.', 'err');
+  } catch(e){ showMsg(e.message || 'Error al cancelar.', 'err'); }
   finally { loader(false); renderApp(); }
 }
 
