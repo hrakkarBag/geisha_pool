@@ -377,7 +377,7 @@ function renderLogin(){
   $('btnIng').onclick = () => {
     const n = $('ln').value.trim(), c = $('lci').value.trim();
     if(!n || !c){ $('lmsg').textContent = 'Complete nombre y CI.'; return; }
-    cliente = {nombre:n, ci:c};
+    cliente = {nombre:n, ci:c.toLowerCase()};
     ss.setItem('cliente', JSON.stringify(cliente));
     ss.setItem('modo', 'cliente');
     modo = 'cliente';
@@ -557,7 +557,7 @@ function renderDay(reservas){
   const esSrv = modo === 'servidor';
   reservas.forEach(r => {
     const top    = (r.inicio - OPEN) * PX_MIN;
-    const esProp = !!(cliente.ci && cliente.ci === r.ci);
+    const esProp = !!(cliente.ci && cliente.ci.trim().toLowerCase() === r.ci.trim().toLowerCase());
     const height = Math.max(r.duracion * PX_MIN, (esProp && r.estado === 'pendiente') ? 80 : 30);
     const canEdit    = esSrv || (esProp && r.estado === 'pendiente');
     const canApprove = esSrv && r.estado === 'pendiente';
@@ -568,9 +568,11 @@ function renderDay(reservas){
     const div = document.createElement('div');
     div.className = `res-block ${cls}`;
     div.style.cssText = `top:${top}px;height:${height}px`;
+    // Clientes solo ven sus propios datos; los ajenos se anonimizan
+    const mostrarDatos = esSrv || esProp;
     div.innerHTML = `
-      <div class="r-name">${r.cliente}</div>
-      <div class="r-meta">${fmt(r.inicio)} – ${fmt(r.inicio+r.duracion)} · CI ${r.ci||'—'}</div>
+      <div class="r-name">${mostrarDatos ? r.cliente : (r.estado === 'reservado' ? 'Reservado' : 'Solicitado')}</div>
+      <div class="r-meta">${fmt(r.inicio)} – ${fmt(r.inicio+r.duracion)}${mostrarDatos ? ' · CI ' + (r.ci||'—') : ''}</div>
       <span class="r-badge ${bc}">${bt}</span>
       <div class="r-actions" id="ra-${r.id}"></div>`;
 
@@ -647,7 +649,7 @@ function mkBtn(cls, txt, cb){
 /* ── Mis solicitudes (vista cliente) ── */
 function renderMisSolicitudes(reservas){
   if(!cliente.ci) return;
-  const propias = reservas.filter(r => r.ci === cliente.ci && r.estado !== 'rechazado');
+  const propias = reservas.filter(r => r.ci.trim().toLowerCase() === cliente.ci.trim().toLowerCase() && r.estado !== 'rechazado');
   const wrap = $('misReservas'); const list = $('misList');
   if(!wrap || !list) return;
   if(!propias.length){ wrap.style.display = 'none'; return; }
@@ -691,7 +693,7 @@ async function solicitar(){
     }
     await insertReserva({
       id: uid(), fecha, inicio, duracion: dur,
-      cliente: cliente.nombre, ci: cliente.ci,
+      cliente: cliente.nombre, ci: cliente.ci.trim().toLowerCase(),
       estado: 'pendiente', creado: Date.now()
     });
     exito = true;
@@ -736,7 +738,7 @@ async function rechazar(id){
 }
 
 async function editar(r){
-  const esPropCliente = modo === 'cliente' && cliente.ci === r.ci && r.estado === 'pendiente';
+  const esPropCliente = modo === 'cliente' && cliente.ci.trim().toLowerCase() === r.ci.trim().toLowerCase() && r.estado === 'pendiente';
   if(modo !== 'servidor' && !esPropCliente){ alert('No puedes editar esta reserva.'); return; }
   const nh = prompt('Nueva hora inicio (HH:MM):', fmt(r.inicio)); if(!nh) return;
   const nd = prompt('Nueva duración (min):', String(r.duracion)); if(!nd) return;
@@ -746,7 +748,7 @@ async function editar(r){
   loader(true);
   try {
     if(esPropCliente){
-      await rpc('cli_editar', {p_ci: cliente.ci, p_id: r.id, p_inicio: inicio, p_duracion: dur});
+      await rpc('cli_editar', {p_ci: cliente.ci.trim(), p_id: r.id, p_inicio: inicio, p_duracion: dur});
     } else {
       const reservas = await fetchReservas(fecha);
       if(overlap(inicio, dur, reservas, r.id))
@@ -762,7 +764,7 @@ async function cancelarProp(r){
   if(!confirm('¿Cancelar tu solicitud de ' + fmt(r.inicio) + '–' + fmt(r.inicio+r.duracion) + '?')) return;
   loader(true);
   try {
-    await rpc('cli_eliminar', {p_ci: cliente.ci, p_id: r.id});
+    await rpc('cli_eliminar', {p_ci: cliente.ci.trim(), p_id: r.id});
     showMsg('Solicitud cancelada.', 'err');
   } catch(e){ showMsg(e.message || 'Error al cancelar.', 'err'); }
   finally { loader(false); renderApp(); }
