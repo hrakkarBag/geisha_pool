@@ -96,8 +96,8 @@ input[type=date].date-pick:focus{outline:none;border-color:var(--gold)}
 
 /* Day view — scroll sincronizado */
 .day-view{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--surface)}
-.day-scroll{display:grid;grid-template-columns:56px 1fr;overflow-y:auto;max-height:min(660px,70vh)}
-.hours-col{background:var(--surface2);border-right:1px solid var(--border);display:flex;flex-direction:column}
+.day-scroll{display:grid;grid-template-columns:80px 1fr;overflow-y:auto;overflow-x:auto;max-height:min(660px,70vh)}
+.hours-col{background:var(--surface2);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;left:0;z-index:5}
 .hour-label{
   display:flex;align-items:flex-start;justify-content:flex-end;
   padding:6px 8px 0 0;color:var(--muted);font-size:.75rem;font-weight:600;
@@ -210,8 +210,8 @@ input[type=date].date-pick:focus{outline:none;border-color:var(--gold)}
   .form-card{grid-template-columns:1fr 1fr;row-gap:10px}
   .form-card .btn-submit{grid-column:1/-1}
   .lists-grid{grid-template-columns:1fr}
-  .day-scroll{grid-template-columns:44px 1fr}
-  .hour-label{font-size:.68rem;padding:5px 5px 0 0}
+  .day-scroll{grid-template-columns:68px 1fr}
+  .hour-label{font-size:.65rem;padding:5px 5px 0 0}
   .res-block{left:4px;right:4px;padding:5px 7px}
   .r-name{font-size:.82rem}.r-meta{font-size:.7rem}
   .logo span{display:none}
@@ -255,7 +255,7 @@ const db = createClient(SUPABASE_URL, SUPABASE_ANON);
 const $      = id => document.getElementById(id);
 const pad    = n  => String(n).padStart(2,'0');
 const today  = () => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
-const fmt    = m  => `${pad(Math.floor(m/60))}:${pad(m%60)}`;
+const fmt    = m  => { const h=Math.floor(m/60)%24,mn=m%60,ap=h>=12?'PM':'AM',h12=h%12||12; return `${h12}:${pad(mn)} ${ap}`; };
 const t2m    = t  => { const [h,m]=t.split(':').map(Number); return h*60+m; };
 const nowMin = () => { const d=new Date(); return d.getHours()*60+d.getMinutes(); };
 const uid    = () => Date.now()+'-'+Math.random().toString(36).slice(2,8);
@@ -422,7 +422,8 @@ function renderVistaRapida(reservas){
   const altura = (CLOSE - OPEN) * VR;
   let hoursHTML = '', linesHTML = '', blocksHTML = '';
   for(let h = Math.floor(OPEN/60); h < Math.floor(CLOSE/60); h++){
-    hoursHTML += `<div class="vr-hlabel" style="height:${60*VR}px">${pad(h)}:00</div>`;
+    const vh12 = h%12||12, vap = h>=12?'PM':'AM';
+    hoursHTML += `<div class="vr-hlabel" style="height:${60*VR}px">${vh12}:00 ${vap}</div>`;
     linesHTML += `<div class="vr-line" style="top:${(h*60-OPEN)*VR}px"></div>`;
   }
   reservas.forEach(r => {
@@ -562,7 +563,8 @@ function renderDay(reservas){
     const lbl = document.createElement('div');
     lbl.className = 'hour-label';
     lbl.style.height = (60 * PX_MIN) + 'px';
-    lbl.textContent = pad(h) + ':00';
+    const h12 = h % 12 || 12, ap = h >= 12 ? 'PM' : 'AM';
+    lbl.textContent = `${h12}:00 ${ap}`;
     hCol.appendChild(lbl);
     const line = document.createElement('div');
     line.className = 'line-hour' + (h % 2 === 0 ? ' prominent' : '');
@@ -692,7 +694,7 @@ async function solicitar(){
   if(!hora){ msgEl.textContent = 'Seleccione hora.'; return; }
   if(isNaN(dur) || dur < 15){ msgEl.textContent = 'Duración mínima 15 min.'; return; }
   const inicio = t2m(hora);
-  if(inicio < OPEN || inicio + dur > CLOSE){ msgEl.textContent = 'Fuera de horario (13:00–24:00).'; return; }
+  if(inicio < OPEN || inicio + dur > CLOSE){ msgEl.textContent = 'Fuera de horario (1:00 PM - 12:00 AM).'; return; }
   if(fecha === today() && inicio < nowMin()){ msgEl.textContent = 'No puede reservar en el pasado.'; return; }
 
   solicitando = true;
@@ -757,11 +759,11 @@ async function rechazar(id){
 async function editar(r){
   const esPropCliente = modo === 'cliente' && cliente.ci.trim().toLowerCase() === r.ci.trim().toLowerCase() && r.estado === 'pendiente';
   if(modo !== 'servidor' && !esPropCliente){ alert('No puedes editar esta reserva.'); return; }
-  const nh = prompt('Nueva hora inicio (HH:MM):', fmt(r.inicio)); if(!nh) return;
+  const nh = prompt('Nueva hora inicio (ej. 14:30 para 2:30 PM):', (() => { const h=Math.floor(r.inicio/60),m=r.inicio%60; return `${pad(h)}:${pad(m)}`; })()); if(!nh) return;
   const nd = prompt('Nueva duración (min):', String(r.duracion)); if(!nd) return;
   const inicio = t2m(nh), dur = parseInt(nd, 10);
   if(isNaN(dur) || dur < 15){ alert('Duración inválida.'); return; }
-  if(inicio < OPEN || inicio + dur > CLOSE){ alert('Fuera de horario (13:00–24:00).'); return; }
+  if(inicio < OPEN || inicio + dur > CLOSE){ alert('Fuera de horario (1:00 PM - 12:00 AM).'); return; }
   loader(true);
   try {
     if(esPropCliente){
