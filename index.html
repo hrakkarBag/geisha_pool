@@ -96,28 +96,13 @@ input[type=date].date-pick:focus{outline:none;border-color:var(--gold)}
 
 /* Day view — scroll sincronizado */
 .day-view{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--surface)}
-.day-scroll{display:grid;grid-template-columns:80px 1fr;overflow-y:auto;overflow-x:auto;max-height:min(660px,70vh)}
-.hours-col{background:var(--surface2);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;left:0;z-index:5}
+.day-scroll{display:grid;grid-template-columns:56px 1fr;overflow-y:auto;max-height:min(660px,70vh)}
+.hours-col{background:var(--surface2);border-right:1px solid var(--border);display:flex;flex-direction:column}
 .hour-label{
   display:flex;align-items:flex-start;justify-content:flex-end;
-  padding:6px 8px 0 0;color:var(--muted);font-size:.72rem;font-weight:600;
+  padding:6px 8px 0 0;color:var(--muted);font-size:.75rem;font-weight:600;
   font-variant-numeric:tabular-nums;height:60px;border-bottom:1px solid rgba(255,255,255,.04);flex-shrink:0;
 }
-/* Stepper duración */
-.dur-stepper{display:flex;align-items:center;gap:4px}
-.dur-stepper .step-btn{
-  background:var(--surface2);border:1px solid var(--border);color:var(--text);
-  width:40px;height:36px;border-radius:var(--r-sm);font-weight:700;font-size:.85rem;
-  cursor:pointer;transition:var(--trans);flex-shrink:0;font-family:'DM Sans',sans-serif;
-}
-.dur-stepper .step-btn:hover{border-color:var(--gold);color:var(--gold)}
-.dur-stepper .step-val{
-  width:54px;text-align:center;background:var(--surface2);border:1px solid var(--border);
-  color:var(--text);padding:8px 4px;border-radius:var(--r-sm);
-  font-family:'DM Sans',sans-serif;font-size:.92rem;transition:var(--trans);
-}
-.dur-stepper .step-val:focus{outline:none;border-color:var(--gold)}
-.dur-stepper .step-val::-webkit-inner-spin-button,.dur-stepper .step-val::-webkit-outer-spin-button{opacity:1}
 .timeline{position:relative;background:var(--surface)}
 .line-hour{position:absolute;left:0;right:0;height:1px;background:rgba(255,255,255,.04)}
 .line-hour.prominent{background:rgba(255,255,255,.08)}
@@ -184,7 +169,7 @@ input[type=date].date-pick:focus{outline:none;border-color:var(--gold)}
 .vr-legend{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap}
 .vr-legend span{display:flex;align-items:center;gap:5px;font-size:.72rem;color:var(--muted)}
 .vr-legend i{width:10px;height:10px;border-radius:2px;display:inline-block;flex-shrink:0}
-.vr-mini-day{display:grid;grid-template-columns:58px 1fr;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.vr-mini-day{display:grid;grid-template-columns:44px 1fr;border:1px solid var(--border);border-radius:10px;overflow:hidden}
 .vr-hours{background:var(--surface2);border-right:1px solid var(--border);display:flex;flex-direction:column}
 .vr-hlabel{display:flex;align-items:flex-start;justify-content:flex-end;padding:4px 6px 0 0;color:var(--muted);font-size:.65rem;font-weight:600;height:48px;border-bottom:1px solid rgba(255,255,255,.04);flex-shrink:0}
 .vr-timeline{position:relative;background:var(--surface);overflow:hidden}
@@ -225,8 +210,8 @@ input[type=date].date-pick:focus{outline:none;border-color:var(--gold)}
   .form-card{grid-template-columns:1fr 1fr;row-gap:10px}
   .form-card .btn-submit{grid-column:1/-1}
   .lists-grid{grid-template-columns:1fr}
-  .day-scroll{grid-template-columns:64px 1fr}
-  .hour-label{font-size:.65rem;padding:5px 5px 0 0}
+  .day-scroll{grid-template-columns:44px 1fr}
+  .hour-label{font-size:.68rem;padding:5px 5px 0 0}
   .res-block{left:4px;right:4px;padding:5px 7px}
   .r-name{font-size:.82rem}.r-meta{font-size:.7rem}
   .logo span{display:none}
@@ -270,7 +255,7 @@ const db = createClient(SUPABASE_URL, SUPABASE_ANON);
 const $      = id => document.getElementById(id);
 const pad    = n  => String(n).padStart(2,'0');
 const today  = () => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
-const fmt    = m  => { const h=Math.floor(m/60)%24,mn=m%60,ap=h>=12?'PM':'AM',h12=h%12||12; return `${h12}:${pad(mn)} ${ap}`; };
+const fmt    = m  => `${pad(Math.floor(m/60))}:${pad(m%60)}`;
 const t2m    = t  => { const [h,m]=t.split(':').map(Number); return h*60+m; };
 const nowMin = () => { const d=new Date(); return d.getHours()*60+d.getMinutes(); };
 const uid    = () => Date.now()+'-'+Math.random().toString(36).slice(2,8);
@@ -300,10 +285,16 @@ async function rpc(fn, params){
 }
 async function notifNtfy(r){
   try {
-    await fetch(`https://ntfy.sh/${NTFY_TEMA}`, {
+    await fetch('https://ntfy.sh/' + NTFY_TEMA, {
       method:'POST',
-      headers:{'Title':'🎱 Nueva solicitud — Geisha Bar','Tags':'billiards','Priority':'default'},
-      body:`${r.cliente} solicitó ${fmt(r.inicio)}–${fmt(r.inicio+r.duracion)} · CI ${r.ci}`
+      mode:'no-cors',
+      headers:{
+        'Title':'Nueva solicitud - Geisha Bar',
+        'Tags':'billiards',
+        'Priority':'default',
+        'Content-Type':'text/plain'
+      },
+      body: r.cliente + ' solicito ' + fmt(r.inicio) + ' - ' + fmt(r.inicio + r.duracion) + ' | Tel: ' + r.ci
     });
   } catch(e){ console.warn('ntfy:', e); }
 }
@@ -373,8 +364,8 @@ function renderLogin(){
       <div class="login-card">
         <div class="login-logo"><img src="./icon-192.png" style="width:72px;height:72px;object-fit:contain;border-radius:16px" alt="Geisha Bar"></div>
         <div class="login-sub">Reserva tu mesa en segundos</div>
-        <div class="login-field"><label>NOMBRE</label><input id="ln" placeholder="Tus nombres y apellidos" autocomplete="given-name"></div>
-        <div class="login-field"><label>TELÉFONO</label><input id="lci" placeholder="Número de teléfono" autocomplete="off"></div>
+        <div class="login-field"><label>Nombre</label><input id="ln" placeholder="Tu nombre" autocomplete="given-name"></div>
+        <div class="login-field"><label>CI</label><input id="lci" placeholder="Carnet de identidad" autocomplete="off"></div>
         <div class="login-btns">
           <button class="btn-login-main" id="btnIng">Ingresar</button>
           <button class="btn-login-srv" id="btnSrv">Servidor</button>
@@ -431,8 +422,7 @@ function renderVistaRapida(reservas){
   const altura = (CLOSE - OPEN) * VR;
   let hoursHTML = '', linesHTML = '', blocksHTML = '';
   for(let h = Math.floor(OPEN/60); h < Math.floor(CLOSE/60); h++){
-    const vh12 = h%12||12, vap = h>=12?'PM':'AM';
-    hoursHTML += `<div class="vr-hlabel" style="height:${60*VR}px">${vh12}:00 ${vap}</div>`;
+    hoursHTML += `<div class="vr-hlabel" style="height:${60*VR}px">${pad(h)}:00</div>`;
     linesHTML += `<div class="vr-line" style="top:${(h*60-OPEN)*VR}px"></div>`;
   }
   reservas.forEach(r => {
@@ -488,7 +478,7 @@ async function _renderApp(){
       ${!esSrv ? `
         <div class="form-card">
           <div class="field"><label>Hora inicio</label><input type="time" id="fHora" value="16:00" step="300"></div>
-          <div class="field"><label>Duración</label><div class="dur-stepper"><button type="button" class="step-btn" id="durMinus">−30</button><input type="number" class="step-val" id="fDur" value="60" min="15" max="660"><button type="button" class="step-btn" id="durPlus">+30</button></div></div>
+          <div class="field"><label>Duración (min)</label><input type="number" id="fDur" value="60" min="15" step="15"></div>
           <button class="btn-submit" id="btnSolicitar">Solicitar</button>
           <div class="form-msg" id="fMsg"></div>
         </div>
@@ -539,28 +529,6 @@ async function _renderApp(){
   };
   if(!esSrv){
     $('btnSolicitar').onclick = solicitar;
-    // Stepper duración
-    const calcMaxDur = () => {
-      const ini = t2m($('fHora').value || '16:00');
-      return Math.max(15, CLOSE - ini);
-    };
-    const clampDur = () => {
-      const el = $('fDur'), max = calcMaxDur();
-      el.max = max;
-      const v = parseInt(el.value) || 60;
-      if (v > max) el.value = max;
-      if (v < 15)  el.value = 15;
-    };
-    $('fHora').addEventListener('change', clampDur);
-    $('durMinus').onclick = () => {
-      const el = $('fDur'), v = Math.max(15, (parseInt(el.value)||60) - 30);
-      el.value = v;
-    };
-    $('durPlus').onclick = () => {
-      const el = $('fDur'), max = calcMaxDur();
-      el.value = Math.min(max, (parseInt(el.value)||60) + 30);
-    };
-    clampDur();
   } else {
     $('btnRefresh').onclick   = () => renderApp();
     $('btnToCliente').onclick = () => { modo = 'cliente'; cliente = {nombre:'',ci:''}; ss.setItem('modo','cliente'); ss.removeItem('cliente'); renderApp(); };
@@ -594,8 +562,7 @@ function renderDay(reservas){
     const lbl = document.createElement('div');
     lbl.className = 'hour-label';
     lbl.style.height = (60 * PX_MIN) + 'px';
-    const h12 = h % 12 || 12, ap = h >= 12 ? 'PM' : 'AM';
-    lbl.textContent = `${h12}:00 ${ap}`;
+    lbl.textContent = pad(h) + ':00';
     hCol.appendChild(lbl);
     const line = document.createElement('div');
     line.className = 'line-hour' + (h % 2 === 0 ? ' prominent' : '');
@@ -603,88 +570,36 @@ function renderDay(reservas){
     tLine.appendChild(line);
   }
 
-  const esSrv      = modo === 'servidor';
-  const ciCliente  = cliente.ci ? cliente.ci.trim().toLowerCase() : '';
-
-  /* ── Asignar columnas a pendientes (para mostrarlos lado a lado) ── */
-  const pending = reservas.filter(r => r.estado === 'pendiente');
-  pending.sort((a, b) => a.inicio - b.inicio);
-  const colEnds = []; // fin de la última reserva en cada columna
-  pending.forEach(b => {
-    let placed = false;
-    for(let i = 0; i < colEnds.length; i++){
-      if(b.inicio >= colEnds[i]){ b._col = i; colEnds[i] = b.inicio + b.duracion; placed = true; break; }
-    }
-    if(!placed){ b._col = colEnds.length; colEnds.push(b.inicio + b.duracion); }
-  });
-  // numCols para cada bloque = máximo _col activo en su rango + 1
-  pending.forEach(b => {
-    const overlapping = pending.filter(x => x.inicio < b.inicio+b.duracion && x.inicio+x.duracion > b.inicio);
-    b._numCols = Math.max(...overlapping.map(x => x._col)) + 1;
-  });
-
+  const esSrv = modo === 'servidor';
   reservas.forEach(r => {
-    const esProp = !esSrv && ciCliente !== '' && ciCliente === r.ci.trim().toLowerCase();
-    // Clientes: rechazados ajenos no se muestran (el slot está libre)
-    if(!esSrv && !esProp && r.estado === 'rechazado') return;
-
     const top    = (r.inicio - OPEN) * PX_MIN;
-    const minH   = (esSrv || esProp) ? 80 : 30;
-    const height = Math.max(r.duracion * PX_MIN, minH);
-    const cls    = r.estado==='pendiente' ? 'res-pend' : r.estado==='reservado' ? 'res-res' : 'res-rech';
+    const esProp = !!(cliente.ci && cliente.ci.trim().toLowerCase() === r.ci.trim().toLowerCase());
+    const height = Math.max(r.duracion * PX_MIN, (esProp && r.estado === 'pendiente') ? 80 : 30);
+    const canEdit    = esSrv || (esProp && r.estado === 'pendiente');
+    const canApprove = esSrv && r.estado === 'pendiente';
+    const cls = r.estado==='pendiente' ? 'res-pend' : r.estado==='reservado' ? 'res-res' : 'res-rech';
+    const bc  = r.estado==='pendiente' ? 'badge-p'  : r.estado==='reservado' ? 'badge-r' : 'badge-x';
+    const bt  = r.estado==='pendiente' ? 'Pendiente' : r.estado==='reservado' ? 'Reservado' : 'Rechazado';
 
     const div = document.createElement('div');
     div.className = `res-block ${cls}`;
-    div.style.top    = top + 'px';
-    div.style.height = height + 'px';
+    div.style.cssText = `top:${top}px;height:${height}px`;
+    // Clientes solo ven sus propios datos; los ajenos se anonimizan
+    const mostrarDatos = esSrv || esProp;
+    div.innerHTML = `
+      <div class="r-name">${mostrarDatos ? r.cliente : (r.estado === 'reservado' ? 'Reservado' : 'Solicitado')}</div>
+      <div class="r-meta">${fmt(r.inicio)} – ${fmt(r.inicio+r.duracion)}${mostrarDatos ? ' · CI ' + (r.ci||'—') : ''}</div>
+      <span class="r-badge ${bc}">${bt}</span>
+      <div class="r-actions" id="ra-${r.id}"></div>`;
 
-    // Posición horizontal
-    if(r.estado === 'pendiente' && r._col !== undefined){
-      const nc = r._numCols, cl = r._col;
-      div.style.left  = `calc(${(cl/nc)*100}% + 3px)`;
-      div.style.width = `calc(${(1/nc)*100}% - 6px)`;
-      div.style.right = 'auto';
+    const ac = div.querySelector(`#ra-${r.id}`);
+    if(canApprove){
+      ac.append(mkBtn('ra-btn ra-approve','✓ Aprobar', () => aprobar(r.id)));
+      ac.append(mkBtn('ra-btn ra-reject', '✗ Rechazar',() => rechazar(r.id)));
     }
-    // aprobados/rechazados: CSS por defecto (left:6px, right:8px)
-
-    const bc = r.estado==='pendiente'?'badge-p':r.estado==='reservado'?'badge-r':'badge-x';
-    const bt = r.estado==='pendiente'?'Pendiente':r.estado==='reservado'?'Reservado':'Rechazado';
-
-    if(esSrv){
-      /* Servidor: datos completos + todas las acciones */
-      div.innerHTML = `
-        <div class="r-name">${r.cliente}</div>
-        <div class="r-meta">${fmt(r.inicio)} – ${fmt(r.inicio+r.duracion)} · CI ${r.ci||'—'}</div>
-        <span class="r-badge ${bc}">${bt}</span>
-        <div class="r-actions" id="ra-${r.id}"></div>`;
-      const ac = div.querySelector(`#ra-${r.id}`);
-      if(r.estado === 'pendiente'){
-        ac.append(mkBtn('ra-btn ra-approve','✓ Aprobar',  () => aprobar(r.id)));
-        ac.append(mkBtn('ra-btn ra-reject', '✗ Rechazar', () => rechazar(r.id)));
-      }
-      ac.append(mkBtn('ra-btn ra-edit',   'Editar', () => editar(r)));
-      ac.append(mkBtn('ra-btn ra-delete', '🗑',      () => eliminar(r)));
-
-    } else if(esProp){
-      /* Cliente: su propia reserva — datos propios + acciones si pendiente */
-      div.innerHTML = `
-        <div class="r-name">${r.cliente}</div>
-        <div class="r-meta">${fmt(r.inicio)} – ${fmt(r.inicio+r.duracion)}</div>
-        <span class="r-badge ${bc}">${bt}</span>
-        <div class="r-actions" id="ra-${r.id}"></div>`;
-      if(r.estado === 'pendiente'){
-        const ac = div.querySelector(`#ra-${r.id}`);
-        ac.append(mkBtn('ra-btn ra-edit',   'Editar',     () => editar(r)));
-        ac.append(mkBtn('ra-btn ra-delete', '🗑 Cancelar', () => cancelarProp(r)));
-      }
-
-    } else {
-      /* Cliente: reserva ajena — sin datos personales */
-      div.innerHTML = `
-        <div class="r-name">Ocupado</div>
-        <div class="r-meta">${fmt(r.inicio)} – ${fmt(r.inicio+r.duracion)}</div>`;
-    }
-
+    if(canEdit)  ac.append(mkBtn('ra-btn ra-edit',  'Editar', () => editar(r)));
+    if(esSrv)    ac.append(mkBtn('ra-btn ra-delete', '🗑',     () => eliminar(r)));
+    if(!esSrv && esProp && r.estado === 'pendiente') ac.append(mkBtn('ra-btn ra-delete', '🗑 Cancelar', () => cancelarProp(r)));
     tLine.appendChild(div);
   });
 }
@@ -731,7 +646,7 @@ function mkItem(r){
   div.innerHTML = `
     <div>
       <div class="ri-name">${r.cliente}</div>
-      <div class="ri-sub">Tel.: ${r.ci} · ${fmt(r.inicio)} – ${fmt(r.inicio+r.duracion)}</div>
+      <div class="ri-sub">CI: ${r.ci} · ${fmt(r.inicio)} – ${fmt(r.inicio+r.duracion)}</div>
       <span class="r-badge ${bc}" style="margin-top:4px">${bt}</span>
     </div>
     <div class="ri-actions"></div>`;
@@ -750,8 +665,7 @@ function mkBtn(cls, txt, cb){
 /* ── Mis solicitudes (vista cliente) ── */
 function renderMisSolicitudes(reservas){
   if(!cliente.ci) return;
-  const ciCli = cliente.ci.trim().toLowerCase();
-  const propias = reservas.filter(r => r.ci.trim().toLowerCase() === ciCli && r.estado !== 'rechazado');
+  const propias = reservas.filter(r => r.ci.trim().toLowerCase() === cliente.ci.trim().toLowerCase() && r.estado !== 'rechazado');
   const wrap = $('misReservas'); const list = $('misList');
   if(!wrap || !list) return;
   if(!propias.length){ wrap.style.display = 'none'; return; }
@@ -841,29 +755,22 @@ async function rechazar(id){
 }
 
 async function editar(r){
-  const esSrv = modo === 'servidor';
-  const ciCliente = cliente.ci ? cliente.ci.trim().toLowerCase() : '';
-  const esPropPend = !esSrv && ciCliente !== '' && ciCliente === r.ci.trim().toLowerCase() && r.estado === 'pendiente';
-
-  if(!esSrv && !esPropPend){ alert('Solo puedes editar tus propias solicitudes pendientes.'); return; }
-
-  const nh = prompt('Nueva hora inicio (HH:MM):', (() => { const h=Math.floor(r.inicio/60),m=r.inicio%60; return `${pad(h)}:${pad(m)}`; })()); if(!nh) return;
+  const esPropCliente = modo === 'cliente' && cliente.ci.trim().toLowerCase() === r.ci.trim().toLowerCase() && r.estado === 'pendiente';
+  if(modo !== 'servidor' && !esPropCliente){ alert('No puedes editar esta reserva.'); return; }
+  const nh = prompt('Nueva hora inicio (HH:MM):', fmt(r.inicio)); if(!nh) return;
   const nd = prompt('Nueva duración (min):', String(r.duracion)); if(!nd) return;
   const inicio = t2m(nh), dur = parseInt(nd, 10);
-  if(isNaN(dur) || dur < 15){ alert('Duración mínima 15 min.'); return; }
-  if(inicio < OPEN || inicio + dur > CLOSE){ alert('Fuera de horario (1:00 PM–12:00 AM).'); return; }
-
+  if(isNaN(dur) || dur < 15){ alert('Duración inválida.'); return; }
+  if(inicio < OPEN || inicio + dur > CLOSE){ alert('Fuera de horario (13:00–24:00).'); return; }
   loader(true);
   try {
-    const reservas = await fetchReservas(fecha);
-    if(esSrv){
+    if(esPropCliente){
+      await rpc('cli_editar', {p_ci: cliente.ci.trim(), p_id: r.id, p_inicio: inicio, p_duracion: dur});
+    } else {
+      const reservas = await fetchReservas(fecha);
       if(overlap(inicio, dur, reservas, r.id))
         if(!confirm('Solapamiento. ¿Aplicar igualmente?')){ loader(false); return; }
       await rpc('srv_editar', {p_pin: srvPin, p_id: r.id, p_inicio: inicio, p_duracion: dur, p_ci: null});
-    } else {
-      const aprobadas = reservas.filter(x => x.estado === 'reservado');
-      if(overlap(inicio, dur, aprobadas, r.id)){ showMsg('Ese horario ya está reservado. Elige otro.', 'err'); loader(false); renderApp(); return; }
-      await rpc('cli_editar', {p_ci: ciCliente, p_id: r.id, p_inicio: inicio, p_duracion: dur});
     }
     showMsg('Reserva actualizada.', 'ok');
   } catch(e){ showMsg(e.message || 'Error al editar.', 'err'); }
@@ -874,7 +781,7 @@ async function cancelarProp(r){
   if(!confirm('¿Cancelar tu solicitud de ' + fmt(r.inicio) + '–' + fmt(r.inicio+r.duracion) + '?')) return;
   loader(true);
   try {
-    await rpc('cli_eliminar', {p_ci: cliente.ci.trim().toLowerCase(), p_id: r.id});
+    await rpc('cli_eliminar', {p_ci: cliente.ci.trim(), p_id: r.id});
     showMsg('Solicitud cancelada.', 'err');
   } catch(e){ showMsg(e.message || 'Error al cancelar.', 'err'); }
   finally { loader(false); renderApp(); }
