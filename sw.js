@@ -1,10 +1,10 @@
 /* ─────────────────────────────────────────────
-   Geisha Bar — Service Worker v9
+   Geisha Bar — Service Worker v10
    Network First para app (index, style, settings)
    Cache First para assets estaticos (icons, fonts)
    ───────────────────────────────────────────── */
 
-const CACHE_NAME   = 'geisha-bar-v9';
+const CACHE_NAME   = 'geisha-bar-v10';
 const APP_FILES    = ['./index.html', './style.css', './settings.js', './manifest.json'];
 const STATIC_FILES = ['./icon-192.png', './icon-512.png'];
 
