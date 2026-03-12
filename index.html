@@ -223,6 +223,21 @@ input[type=date].date-pick:focus{outline:none;border-color:var(--gold)}
   .res-item{flex-direction:column;align-items:flex-start}
   .ri-actions{width:100%;justify-content:flex-start}
 }
+
+.dur-stepper{display:flex;align-items:center;gap:6px;width:100%}
+.dur-stepper button{
+  width:34px;height:34px;border-radius:var(--r-sm);border:1px solid var(--border);
+  background:var(--surface2);color:var(--text);font-size:1.1rem;font-weight:700;
+  cursor:pointer;flex-shrink:0;transition:var(--trans);line-height:1;
+}
+.dur-stepper button:hover{background:var(--gold);color:#000;border-color:var(--gold)}
+.dur-stepper button:disabled{opacity:.3;cursor:not-allowed}
+#durDisplay{
+  flex:1;text-align:center;background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--r-sm);padding:6px 4px;font-size:.92rem;font-weight:700;
+  color:var(--gold);white-space:nowrap;
+}
+
 ::-webkit-scrollbar{width:6px;height:6px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
@@ -242,7 +257,8 @@ input[type=date].date-pick:focus{outline:none;border-color:var(--gold)}
 ══════════════════════════════════════════════ */
 const SUPABASE_URL  = 'https://pvoafqlwevbmfmdbdjsx.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB2b2FmcWx3ZXZibWZtZGJkanN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNDIyOTgsImV4cCI6MjA4ODYxODI5OH0.xdv1XQiafCrVWs1ccz1K_P472pNtB-rvlQ5fdQUd51U';
-const SERVER_PIN = '0213';
+const SERVER_PIN  = '0213';
+const NTFY_TEMA = 'geisha-billar-k9x3'; // ← pon aquí tu tema secreto, ej: 'geisha-billar-x7k2'
 const OPEN  = 13 * 60;   // 13:00
 const CLOSE = 24 * 60;   // 24:00
 const PX_MIN = 1;
@@ -306,7 +322,10 @@ function suscribir(){
   rtChan = db.channel('reservas-changes')
     .on('postgres_changes', {event:'*', schema:'public', table:'reservas'}, payload => {
       renderApp();
-      if(payload.eventType === 'INSERT') pushNotif(payload.new);
+      if(payload.eventType === 'INSERT'){
+        pushNotif(payload.new);
+        ntfyNotif(payload.new);
+      }
     })
     .subscribe(status => {
       if(status === 'SUBSCRIBED')                              { rtStatus = 'ok';    updateRtBadge(); }
@@ -322,6 +341,22 @@ function updateRtBadge(){
   const map = { connecting:{label:'Conectando…',dot:'#d97706'}, ok:{label:'En vivo',dot:'#2ea84e'}, error:{label:'Sin Realtime',dot:'#e53e3e'} };
   const s = map[rtStatus] || map.ok;
   el.innerHTML = `${s.label}<span class="rt-dot" style="background:${s.dot}"></span>`;
+}
+
+async function ntfyNotif(r){
+  if(!NTFY_TEMA) return;
+  try {
+    await fetch(`https://ntfy.sh/${NTFY_TEMA}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Title': '🎱 Nueva solicitud — Geisha Bar',
+        'Priority': 'high',
+        'Tags': 'billiards,new'
+      },
+      body: `👤 ${r.cliente} (CI: ${r.ci})\n🕐 ${fmt(r.inicio)} – ${fmt(r.inicio+r.duracion)}\n📅 ${r.fecha}`
+    });
+  } catch(e){ console.warn('ntfy error', e); }
 }
 
 async function pedirPermiso(){
@@ -377,7 +412,7 @@ function renderLogin(){
   $('btnIng').onclick = () => {
     const n = $('ln').value.trim(), c = $('lci').value.trim();
     if(!n || !c){ $('lmsg').textContent = 'Complete nombre y CI.'; return; }
-    cliente = {nombre:n, ci:c.toLowerCase()};
+    cliente = {nombre:n, ci:c};
     ss.setItem('cliente', JSON.stringify(cliente));
     ss.setItem('modo', 'cliente');
     modo = 'cliente';
@@ -461,8 +496,19 @@ async function _renderApp(){
 
       ${!esSrv ? `
         <div class="form-card">
-          <div class="field"><label>Hora inicio</label><input type="time" id="fHora" value="16:00" step="300"></div>
-          <div class="field"><label>Duración (min)</label><input type="number" id="fDur" value="60" min="15" step="15"></div>
+          <div class="field"><label>Hora inicio</label>
+            <select id="fHora" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:.92rem">
+              ${(()=>{let o='';for(let m=OPEN;m<CLOSE;m+=30){const h=Math.floor(m/60),mn=m%60,ampm=h>=12?'PM':'AM',h12=h%12||12;o+=`<option value="${pad(h)+':'+pad(mn)}">${h12}:${pad(mn)} ${ampm}</option>`;}return o;})()}
+            </select>
+          </div>
+          <div class="field"><label>Tiempo a jugar</label>
+            <div class="dur-stepper">
+              <button id="durMinus" type="button">−</button>
+              <span id="durDisplay">1h 00min</span>
+              <input type="hidden" id="fDur" value="60">
+              <button id="durPlus" type="button">+</button>
+            </div>
+          </div>
           <button class="btn-submit" id="btnSolicitar">Solicitar</button>
           <div class="form-msg" id="fMsg"></div>
         </div>
@@ -513,6 +559,28 @@ async function _renderApp(){
   };
   if(!esSrv){
     $('btnSolicitar').onclick = solicitar;
+
+    // Stepper de duración — recalcula máximo según hora seleccionada
+    function durFmt(m){ return m < 60 ? `${m}min` : m%60===0 ? `${m/60}h` : `${Math.floor(m/60)}h ${m%60}min`; }
+    function durMax(){ return CLOSE - t2m($('fHora').value); }
+    function stepDur(delta){
+      const inp = $('fDur'), cur = parseInt(inp.value,10);
+      const next = Math.min(Math.max(cur + delta, 30), durMax());
+      inp.value = next;
+      $('durDisplay').textContent = durFmt(next);
+      $('durMinus').disabled = next <= 30;
+      $('durPlus').disabled  = next >= durMax();
+    }
+    $('durMinus').onclick = () => stepDur(-30);
+    $('durPlus').onclick  = () => stepDur(+30);
+    $('fHora').onchange   = () => {
+      const inp = $('fDur'), max = durMax();
+      if(parseInt(inp.value,10) > max){ inp.value = max; $('durDisplay').textContent = durFmt(max); }
+      $('durMinus').disabled = parseInt(inp.value,10) <= 30;
+      $('durPlus').disabled  = parseInt(inp.value,10) >= max;
+    };
+    // Init
+    stepDur(0);
   } else {
     $('btnRefresh').onclick   = () => renderApp();
     $('btnToCliente').onclick = () => { modo = 'cliente'; cliente = {nombre:'',ci:''}; ss.setItem('modo','cliente'); ss.removeItem('cliente'); renderApp(); };
@@ -555,61 +623,33 @@ function renderDay(reservas){
   }
 
   const esSrv = modo === 'servidor';
-
   reservas.forEach(r => {
-    const ciCliente = cliente.ci ? cliente.ci.trim().toLowerCase() : '';
-    const esProp    = !esSrv && ciCliente !== '' && ciCliente === r.ci.trim().toLowerCase();
-
-    // Clientes: rechazados ajenos son invisibles (el slot queda libre)
-    if (!esSrv && !esProp && r.estado === 'rechazado') return;
-
     const top    = (r.inicio - OPEN) * PX_MIN;
-    const height = Math.max(r.duracion * PX_MIN, (esSrv || esProp) ? 80 : 30);
+    const esProp = !!(cliente.ci && cliente.ci === r.ci);
+    const height = Math.max(r.duracion * PX_MIN, (esProp && r.estado === 'pendiente') ? 80 : 30);
+    const canEdit    = esSrv || (esProp && r.estado === 'pendiente');
+    const canApprove = esSrv && r.estado === 'pendiente';
     const cls = r.estado==='pendiente' ? 'res-pend' : r.estado==='reservado' ? 'res-res' : 'res-rech';
+    const bc  = r.estado==='pendiente' ? 'badge-p'  : r.estado==='reservado' ? 'badge-r' : 'badge-x';
+    const bt  = r.estado==='pendiente' ? 'Pendiente' : r.estado==='reservado' ? 'Reservado' : 'Rechazado';
 
     const div = document.createElement('div');
     div.className = `res-block ${cls}`;
     div.style.cssText = `top:${top}px;height:${height}px`;
+    div.innerHTML = `
+      <div class="r-name">${r.cliente}</div>
+      <div class="r-meta">${fmt(r.inicio)} – ${fmt(r.inicio+r.duracion)} · CI ${r.ci||'—'}</div>
+      <span class="r-badge ${bc}">${bt}</span>
+      <div class="r-actions" id="ra-${r.id}"></div>`;
 
-    if (esSrv) {
-      /* ── Servidor: vista completa ── */
-      const bc = r.estado==='pendiente' ? 'badge-p' : r.estado==='reservado' ? 'badge-r' : 'badge-x';
-      const bt = r.estado==='pendiente' ? 'Pendiente' : r.estado==='reservado' ? 'Reservado' : 'Rechazado';
-      div.innerHTML = `
-        <div class="r-name">${r.cliente}</div>
-        <div class="r-meta">${fmt(r.inicio)} – ${fmt(r.inicio+r.duracion)} · CI ${r.ci||'—'}</div>
-        <span class="r-badge ${bc}">${bt}</span>
-        <div class="r-actions" id="ra-${r.id}"></div>`;
-      const ac = div.querySelector(`#ra-${r.id}`);
-      if (r.estado === 'pendiente') {
-        ac.append(mkBtn('ra-btn ra-approve', '✓ Aprobar',  () => aprobar(r.id)));
-        ac.append(mkBtn('ra-btn ra-reject',  '✗ Rechazar', () => rechazar(r.id)));
-      }
-      ac.append(mkBtn('ra-btn ra-edit',   'Editar', () => editar(r)));
-      ac.append(mkBtn('ra-btn ra-delete', '🗑',      () => eliminar(r)));
-
-    } else if (esProp) {
-      /* ── Cliente: reserva propia ── */
-      const bc = r.estado==='pendiente' ? 'badge-p' : r.estado==='reservado' ? 'badge-r' : 'badge-x';
-      const bt = r.estado==='pendiente' ? 'Pendiente' : r.estado==='reservado' ? 'Reservado' : 'Rechazado';
-      div.innerHTML = `
-        <div class="r-name">${r.cliente}</div>
-        <div class="r-meta">${fmt(r.inicio)} – ${fmt(r.inicio+r.duracion)}</div>
-        <span class="r-badge ${bc}">${bt}</span>
-        <div class="r-actions" id="ra-${r.id}"></div>`;
-      if (r.estado === 'pendiente') {
-        const ac = div.querySelector(`#ra-${r.id}`);
-        ac.append(mkBtn('ra-btn ra-edit',   'Editar',     () => editar(r)));
-        ac.append(mkBtn('ra-btn ra-delete', '🗑 Cancelar', () => cancelarProp(r)));
-      }
-
-    } else {
-      /* ── Cliente: reserva ajena — sin datos personales ── */
-      div.innerHTML = `
-        <div class="r-name">Ocupado</div>
-        <div class="r-meta">${fmt(r.inicio)} – ${fmt(r.inicio+r.duracion)}</div>`;
+    const ac = div.querySelector(`#ra-${r.id}`);
+    if(canApprove){
+      ac.append(mkBtn('ra-btn ra-approve','✓ Aprobar', () => aprobar(r.id)));
+      ac.append(mkBtn('ra-btn ra-reject', '✗ Rechazar',() => rechazar(r.id)));
     }
-
+    if(canEdit)  ac.append(mkBtn('ra-btn ra-edit',  'Editar', () => editar(r)));
+    if(esSrv)    ac.append(mkBtn('ra-btn ra-delete', '🗑',     () => eliminar(r)));
+    if(!esSrv && esProp && r.estado === 'pendiente') ac.append(mkBtn('ra-btn ra-delete', '🗑 Cancelar', () => cancelarProp(r)));
     tLine.appendChild(div);
   });
 }
@@ -675,7 +715,7 @@ function mkBtn(cls, txt, cb){
 /* ── Mis solicitudes (vista cliente) ── */
 function renderMisSolicitudes(reservas){
   if(!cliente.ci) return;
-  const propias = reservas.filter(r => r.ci.trim().toLowerCase() === cliente.ci.trim().toLowerCase() && r.estado !== 'rechazado');
+  const propias = reservas.filter(r => r.ci === cliente.ci && r.estado !== 'rechazado');
   const wrap = $('misReservas'); const list = $('misList');
   if(!wrap || !list) return;
   if(!propias.length){ wrap.style.display = 'none'; return; }
@@ -719,7 +759,7 @@ async function solicitar(){
     }
     await insertReserva({
       id: uid(), fecha, inicio, duracion: dur,
-      cliente: cliente.nombre, ci: cliente.ci.trim().toLowerCase(),
+      cliente: cliente.nombre, ci: cliente.ci,
       estado: 'pendiente', creado: Date.now()
     });
     exito = true;
@@ -764,39 +804,25 @@ async function rechazar(id){
 }
 
 async function editar(r){
-  const esSrv = modo === 'servidor';
-  const ciCliente = cliente.ci ? cliente.ci.trim().toLowerCase() : '';
-  const esPropPend = !esSrv && ciCliente !== '' && ciCliente === r.ci.trim().toLowerCase() && r.estado === 'pendiente';
-
-  if (!esSrv && !esPropPend) {
-    alert('Solo puedes editar tus propias solicitudes pendientes.');
-    return;
-  }
-
-  const nh = prompt('Nueva hora inicio (HH:MM):', fmt(r.inicio)); if (!nh) return;
-  const nd = prompt('Nueva duración (min):', String(r.duracion)); if (!nd) return;
+  const esPropCliente = modo === 'cliente' && cliente.ci === r.ci && r.estado === 'pendiente';
+  if(modo !== 'servidor' && !esPropCliente){ alert('No puedes editar esta reserva.'); return; }
+  const nh = prompt('Nueva hora inicio (HH:MM):', fmt(r.inicio)); if(!nh) return;
+  const nd = prompt('Nueva duración (min):', String(r.duracion)); if(!nd) return;
   const inicio = t2m(nh), dur = parseInt(nd, 10);
-  if (isNaN(dur) || dur < 15) { alert('Duración mínima 15 min.'); return; }
-  if (inicio < OPEN || inicio + dur > CLOSE) { alert('Fuera de horario (13:00–24:00).'); return; }
-
+  if(isNaN(dur) || dur < 15){ alert('Duración inválida.'); return; }
+  if(inicio < OPEN || inicio + dur > CLOSE){ alert('Fuera de horario (13:00–24:00).'); return; }
   loader(true);
   try {
-    const reservas = await fetchReservas(fecha);
-    if (esSrv) {
-      if (overlap(inicio, dur, reservas, r.id))
-        if (!confirm('Solapamiento. ¿Aplicar igualmente?')) { loader(false); return; }
-      await rpc('srv_editar', {p_pin: srvPin, p_id: r.id, p_inicio: inicio, p_duracion: dur, p_ci: null});
+    if(esPropCliente){
+      await rpc('cli_editar', {p_ci: cliente.ci, p_id: r.id, p_inicio: inicio, p_duracion: dur});
     } else {
-      // Cliente editando su propia reserva pendiente
-      const aprobadas = reservas.filter(x => x.estado === 'reservado');
-      if (overlap(inicio, dur, aprobadas, r.id)) {
-        showMsg('Ese horario ya está reservado. Elige otro.', 'err');
-        loader(false); renderApp(); return;
-      }
-      await rpc('cli_editar', {p_ci: ciCliente, p_id: r.id, p_inicio: inicio, p_duracion: dur});
+      const reservas = await fetchReservas(fecha);
+      if(overlap(inicio, dur, reservas, r.id))
+        if(!confirm('Solapamiento. ¿Aplicar igualmente?')){ loader(false); return; }
+      await rpc('srv_editar', {p_pin: srvPin, p_id: r.id, p_inicio: inicio, p_duracion: dur, p_ci: null});
     }
     showMsg('Reserva actualizada.', 'ok');
-  } catch(e) { showMsg(e.message || 'Error al editar.', 'err'); }
+  } catch(e){ showMsg(e.message || 'Error al editar.', 'err'); }
   finally { loader(false); renderApp(); }
 }
 
@@ -804,7 +830,7 @@ async function cancelarProp(r){
   if(!confirm('¿Cancelar tu solicitud de ' + fmt(r.inicio) + '–' + fmt(r.inicio+r.duracion) + '?')) return;
   loader(true);
   try {
-    await rpc('cli_eliminar', {p_ci: cliente.ci.trim().toLowerCase(), p_id: r.id});
+    await rpc('cli_eliminar', {p_ci: cliente.ci, p_id: r.id});
     showMsg('Solicitud cancelada.', 'err');
   } catch(e){ showMsg(e.message || 'Error al cancelar.', 'err'); }
   finally { loader(false); renderApp(); }
