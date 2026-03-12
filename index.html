@@ -259,6 +259,11 @@ const SUPABASE_URL  = 'https://pvoafqlwevbmfmdbdjsx.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB2b2FmcWx3ZXZibWZtZGJkanN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNDIyOTgsImV4cCI6MjA4ODYxODI5OH0.xdv1XQiafCrVWs1ccz1K_P472pNtB-rvlQ5fdQUd51U';
 const SERVER_PIN = '0213';
 const NTFY_TEMA  = 'geisha-billar-k9x3';
+  fetch('https://ntfy.sh/geisha-billar-k9x3', {
+  method: 'POST',
+  headers: { 'Title': 'Test Geisha' },
+  body: 'Prueba de notificación'
+});
 const OPEN  = 13 * 60;   // 13:00
 const CLOSE = 24 * 60;   // 24:00
 const PX_MIN = 1;
