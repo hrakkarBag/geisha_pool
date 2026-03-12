@@ -1,89 +1,71 @@
 /* ─────────────────────────────────────────────
-   Billar Club — Service Worker
-   Estrategia: Cache First para assets estáticos
+   Geisha Bar — Service Worker v9
+   Network First para app (index, style, settings)
+   Cache First para assets estaticos (icons, fonts)
    ───────────────────────────────────────────── */
 
-const CACHE_NAME  = 'geisha-bar-v8';
-const CACHE_URLS  = [
-  './index.html',
-  './manifest.json',
-  './icon-192.png',
-  './icon-512.png',
-  'https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600;700&display=swap'
-];
+const CACHE_NAME   = 'geisha-bar-v9';
+const APP_FILES    = ['./index.html', './style.css', './settings.js', './manifest.json'];
+const STATIC_FILES = ['./icon-192.png', './icon-512.png'];
 
-/* ── Install: precachear recursos ── */
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      // Las Google Fonts pueden fallar en modo offline en la instalación;
-      // usamos addAll solo con recursos locales y capturamos el resto.
-      return cache.addAll([
-        './index.html',
-        './manifest.json',
-        './icon-192.png',
-        './icon-512.png'
-      ]).then(() => {
-        // Intentar cachear fuentes (no crítico si falla)
-        return cache.add('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600;700&display=swap')
-          .catch(() => {/* sin conexión en instalación, no bloqueamos */});
-      });
-    }).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then(cache =>
+      cache.addAll([...APP_FILES, ...STATIC_FILES]).catch(() =>
+        cache.addAll(STATIC_FILES)
+      )
+    ).then(() => self.skipWaiting())  // forzar activacion inmediata
   );
 });
 
-/* ── Activate: limpiar cachés viejos ── */
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(
-        keys
-          .filter(key => key !== CACHE_NAME)
-          .map(key => caches.delete(key))
-      )
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
 });
 
-/* ── Fetch: Cache First → Network fallback ── */
 self.addEventListener('fetch', event => {
-  // Solo interceptar GET
-  if (event.request.method !== 'GET') return;
+  if(event.request.method !== 'GET') return;
+  if(!event.request.url.startsWith('http')) return;
+  if(event.request.url.includes('.supabase.co')) return;
+  if(event.request.url.includes('ntfy.sh')) return;
 
-  // Ignorar chrome-extension u otros esquemas
-  if (!event.request.url.startsWith('http')) return;
+  const url = event.request.url;
+  const isAppFile = APP_FILES.some(f => url.endsWith(f.replace('./', '/'))) ||
+                    url.endsWith('/') || url.endsWith('index.html') ||
+                    url.endsWith('style.css') || url.endsWith('settings.js');
 
-  // NUNCA cachear llamadas a Supabase (datos dinamicos en tiempo real)
-  if (event.request.url.includes('.supabase.co')) return;
-
-  event.respondWith(
-    caches.match(event.request).then(cached => {
-      if (cached) return cached;
-
-      return fetch(event.request)
-        .then(networkResponse => {
-          // Solo cachear respuestas válidas
-          if (
-            networkResponse &&
-            networkResponse.status === 200 &&
-            networkResponse.type !== 'opaque'  // evitar cachear respuestas CORS opacas
-          ) {
-            const clone = networkResponse.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+  if(isAppFile){
+    /* Network First: siempre intenta la red primero para obtener la version mas reciente */
+    event.respondWith(
+      fetch(event.request).then(res => {
+        const clone = res.clone();
+        caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
+        return res;
+      }).catch(() => caches.match(event.request))
+    );
+  } else {
+    /* Cache First: icons, fonts, librerias */
+    event.respondWith(
+      caches.match(event.request).then(cached => {
+        if(cached) return cached;
+        return fetch(event.request).then(res => {
+          if(res && res.status === 200 && res.type !== 'opaque'){
+            const clone = res.clone();
+            caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
           }
-          return networkResponse;
-        })
-        .catch(() => {
-          // Offline y no en caché: devolver index.html como fallback
-          if (event.request.destination === 'document') {
+          return res;
+        }).catch(() => {
+          if(event.request.destination === 'document')
             return caches.match('./index.html');
-          }
         });
-    })
-  );
+      })
+    );
+  }
 });
 
-/* ── Mensaje: forzar actualización desde cliente ── */
 self.addEventListener('message', event => {
-  if (event.data === 'SKIP_WAITING') self.skipWaiting();
+  if(event.data === 'SKIP_WAITING') self.skipWaiting();
 });
