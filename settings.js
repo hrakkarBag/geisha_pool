@@ -55,7 +55,7 @@ async function notifNtfy(r){
         'Priority': 'default',
         'Content-Type': 'text/plain'
       },
-      body: r.cliente + ' solicito ' + fmt(r.inicio) + ' - ' + fmt(r.inicio + r.duracion) + ' | Tel: ' + r.ci
+      body: r.cliente + ' solicito ' + fmt(r.inicio) + ' - ' + fmt(r.inicio + r.duracion) + ' el ' + r.fecha + ' | Tel: ' + r.ci
     });
   } catch(e){ console.warn('ntfy:', e); }
 }
@@ -538,7 +538,7 @@ async function solicitar(){
       cliente: cliente.nombre, ci: cliente.ci.trim().toLowerCase(),
       estado: 'pendiente', creado: Date.now()
     });
-    notifNtfy({inicio, duracion: dur, cliente: cliente.nombre, ci: cliente.ci.trim().toLowerCase()});
+    notifNtfy({inicio, duracion: dur, cliente: cliente.nombre, ci: cliente.ci.trim().toLowerCase(), fecha});
     exito = true;
     msg = {text:'Solicitud enviada — pendiente de aprobacion.', type:'ok'};
     const m2 = $('fMsg');
